@@ -15,16 +15,25 @@ public class FileNameSearchProvider : IDisposable
     public char DriveLetter => _driveLetter;
 
     /// <summary>更新扫描驱动器</summary>
+    private List<string> _fallbackPaths = []; // Fallback 遍历路径
+
     public void SetDrive(char driveLetter)
     {
         if (_driveLetter == driveLetter) return;
         _driveLetter = driveLetter;
     }
+
+    /// <summary>设置 Fallback 遍历路径（USN 不可用时使用）</summary>
+    public void SetFallbackPaths(List<string> paths)
+    {
+        _fallbackPaths = paths;
+    }
     private FileSystemWatcher? _watcher;
     private int _initialized; // 使用 int + Interlocked 防止 TOCTOU
     private bool _disposed;
     private volatile bool _rebuilding;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _recentFiles = new(); // 防抖
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _recentFiles = new();
+    private HashSet<string> _extFilter = []; // 文件名后缀过滤
 
     /// <summary>索引状态变更事件</summary>
     public event Action<IndexState>? StateChanged;
@@ -35,8 +44,16 @@ public class FileNameSearchProvider : IDisposable
 
     public IndexState State { get; private set; } = IndexState.NotInitialized;
 
-    /// <summary>获取内部索引（供过滤统计等用途）</summary>
+    /// <summary>获取内部索引</summary>
     public FileNameIndex GetIndex() => _index;
+
+    /// <summary>设置文件名后缀过滤（空列表=不过滤）</summary>
+    public void SetExtensionFilter(List<string> extensions)
+    {
+        _extFilter = extensions.Count > 0
+            ? new HashSet<string>(extensions.Select(e => $".{e.TrimStart('.')}"), StringComparer.OrdinalIgnoreCase)
+            : [];
+    }
 
     /// <summary>当前索引文件总数</summary>
     public int IndexCount => _index.Count;
@@ -59,9 +76,13 @@ public class FileNameSearchProvider : IDisposable
 
         try
         {
-            var files = await scanner.ScanAllAsync();
+        var files = await scanner.ScanAllAsync(_fallbackPaths);
+        AppLog.Info("fname", $"USN 扫描完成: {files.Count} 个文件 (盘符={_driveLetter})");
 
-            _index.AddRange(files);
+            var filtered = _extFilter.Count == 0 ? files : files.Where(f => PassExtFilter(f.FullPath)).ToList();
+            AppLog.Info("fname", $"AddRange: 扫描={files.Count}, 后缀过滤后={filtered.Count}, extFilter=[{string.Join(",", _extFilter)}]");
+            _index.AddRange(filtered);
+            AppLog.Info("fname", $"AddRange完成: _allFiles={_index.Count}");
 
             // 启动文件变更监听
             StartWatcher();
@@ -177,7 +198,7 @@ public class FileNameSearchProvider : IDisposable
 
     private void OnFileCreated(object sender, FileSystemEventArgs e)
     {
-        if (_rebuilding || ShouldIgnore(e.FullPath)) return;
+        if (_rebuilding || ShouldIgnore(e.FullPath) || !PassExtFilter(e.FullPath)) return;
         if (!Debounce(e.FullPath)) return;
         try
         {
@@ -189,6 +210,8 @@ public class FileNameSearchProvider : IDisposable
                     FileName = fi.Name,
                     FullPath = fi.FullName,
                     Directory = fi.DirectoryName ?? "",
+                    NamePinyin = Analysis.PinyinHelper.GetFirstLetters(fi.Name),
+                    NameFullPinyin = Analysis.PinyinHelper.GetPinyin(fi.Name),
                     FileSize = fi.Length,
                     LastModified = fi.LastWriteTime
                 });
@@ -220,6 +243,8 @@ public class FileNameSearchProvider : IDisposable
                     FileName = fi.Name,
                     FullPath = fi.FullName,
                     Directory = fi.DirectoryName ?? "",
+                    NamePinyin = Analysis.PinyinHelper.GetFirstLetters(fi.Name),
+                    NameFullPinyin = Analysis.PinyinHelper.GetPinyin(fi.Name),
                     FileSize = fi.Length,
                     LastModified = fi.LastWriteTime
                 });
@@ -243,6 +268,8 @@ public class FileNameSearchProvider : IDisposable
                     FileName = fi.Name,
                     FullPath = fi.FullName,
                     Directory = fi.DirectoryName ?? "",
+                    NamePinyin = Analysis.PinyinHelper.GetFirstLetters(fi.Name),
+                    NameFullPinyin = Analysis.PinyinHelper.GetPinyin(fi.Name),
                     FileSize = fi.Length,
                     LastModified = fi.LastWriteTime
                 });
@@ -266,14 +293,20 @@ public class FileNameSearchProvider : IDisposable
     {
         var name = System.IO.Path.GetFileName(path);
         if (name.Length == 0) return true;
-        // Office 临时文件
         if (name[0] == '~' || (name[0] == '$' && name.EndsWith(".docx", StringComparison.OrdinalIgnoreCase)))
             return true;
-        // Lucene 索引目录
         if (path.Contains("\\Index\\", StringComparison.OrdinalIgnoreCase) &&
             (name.StartsWith('_') || name.StartsWith("segments") || name == "write.lock"))
             return true;
         return false;
+    }
+
+    /// <summary>是否通过后缀过滤（空过滤器=全部通过）</summary>
+    private bool PassExtFilter(string path)
+    {
+        if (_extFilter.Count == 0) return true;
+        var ext = System.IO.Path.GetExtension(path);
+        return _extFilter.Contains(ext);
     }
 
     private void OnWatcherError(object sender, ErrorEventArgs e)

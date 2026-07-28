@@ -51,7 +51,7 @@ public class ContentSearcher : IDisposable
             // 搜索文件名和内容两个字段（JiebaAnalyzer 会自动进行中文分词）
             var queryParser = new MultiFieldQueryParser(
                 Lucene.Net.Util.Version.LUCENE_30,
-                ["filename", "content"],
+                ["filename", "content", "pinyin"],
                 _analyzer);
 
             // 转义特殊字符

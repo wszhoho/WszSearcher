@@ -26,7 +26,10 @@ public class FileNameIndex : IDisposable
         _lock.EnterReadLock();
         try
         {
-            return _allFiles.Count(f => paths.Any(p =>
+            var sample = _allFiles.Take(3).Select(f => f.FullPath).ToList();
+            var ps = paths.Select(p => p.EndsWith('\\') ? p : p + "\\").ToList();
+            AppLog.Info("fname", $"CountInPaths: paths=[{string.Join(",", ps)}], sample=[{string.Join(",", sample)}]");
+            return _allFiles.Count(f => ps.Any(p =>
                 f.FullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)));
         }
         finally { _lock.ExitReadLock(); }
@@ -150,7 +153,7 @@ public class FileNameIndex : IDisposable
             }
         }
 
-        // Phase 3: 路径包含匹配（如果还差）
+        // Phase 3: 路径包含匹配
         if (results.Count < maxResults)
         {
             foreach (var record in snapshot)
@@ -165,7 +168,29 @@ public class FileNameIndex : IDisposable
             }
         }
 
+        // Phase 4: 拼音首字母 + 全拼匹配（仅纯 ASCII 查询）
+        if (results.Count < maxResults && IsAscii(q))
+        {
+            foreach (var record in snapshot)
+            {
+                if (results.Count >= maxResults) break;
+                if (seen.Contains(record.FullPath)) continue;
+                if ((record.NamePinyin.Length > 0 && record.NamePinyin.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
+                    (record.NameFullPinyin.Length > 0 && record.NameFullPinyin.Contains(q, StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (seen.Add(record.FullPath))
+                        results.Add(record);
+                }
+            }
+        }
+
         return results;
+    }
+
+    private static bool IsAscii(string s)
+    {
+        foreach (var c in s) if (c > 127) return false;
+        return true;
     }
 
     /// <summary>清空索引</summary>

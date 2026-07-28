@@ -42,11 +42,28 @@ public class ContentIndexer : IDisposable
             Path.GetDirectoryName(AppContext.BaseDirectory) ?? ".",
             "Index");
 
+        // 清理上次异常退出残留的写锁
+        CleanStaleLock();
+
         System.IO.Directory.CreateDirectory(_indexPath);
         _parsers = new ParserRegistry();
         _directory = FSDirectory.Open(_indexPath);
         _analyzer = new JiebaAnalyzer();
         Debug.WriteLine($"[ContentIndexer] 索引路径: {_indexPath}");
+    }
+
+    private void CleanStaleLock()
+    {
+        try
+        {
+            var lockFile = Path.Combine(_indexPath, "write.lock");
+            if (System.IO.File.Exists(lockFile))
+            {
+                System.IO.File.Delete(lockFile);
+                Debug.WriteLine($"[ContentIndexer] 清理残留 write.lock");
+            }
+        }
+        catch { }
     }
 
     /// <summary>打开或创建 IndexWriter（线程安全）</summary>
@@ -140,6 +157,12 @@ public class ContentIndexer : IDisposable
             doc.Add(new Field("extension", Path.GetExtension(filePath).TrimStart('.').ToLowerInvariant(),
                 Field.Store.YES, Field.Index.NOT_ANALYZED));
             doc.Add(new Field("content", text, Field.Store.NO, Field.Index.ANALYZED));
+            // 拼音字段：首字母 + 全拼（Lucene 分词后都可搜索）
+            var py = Analysis.PinyinHelper.GetFirstLetters(text);
+            var fullPy = Analysis.PinyinHelper.GetPinyin(text);
+            var pinyin = string.IsNullOrEmpty(fullPy) ? py : $"{py} {fullPy}";
+            if (pinyin.Length > 0)
+                doc.Add(new Field("pinyin", pinyin, Field.Store.NO, Field.Index.ANALYZED));
 
             // 原子操作：删除旧文档 + 添加新文档
             writer.DeleteDocuments(new Term("path", filePath));

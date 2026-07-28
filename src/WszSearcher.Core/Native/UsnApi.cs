@@ -8,8 +8,8 @@ internal static class UsnApi
 {
     // ─── FSCTL 控制码 ───
     internal const uint FSCTL_QUERY_USN_JOURNAL = 0x000900f4;
-    internal const uint FSCTL_ENUM_USN_DATA = 0x000900f3;
-    internal const uint FSCTL_READ_USN_JOURNAL = 0x0009033b;
+    internal const uint FSCTL_ENUM_USN_DATA = 0x000900b3;
+    internal const uint FSCTL_READ_USN_JOURNAL = 0x000900BB;
 
     // ─── 访问权限 ───
     private const uint GENERIC_READ = 0x80000000;
@@ -17,7 +17,6 @@ internal static class UsnApi
     private const uint FILE_SHARE_READ = 0x00000001;
     private const uint FILE_SHARE_WRITE = 0x00000002;
     private const uint OPEN_EXISTING = 3;
-    private const uint FILE_FLAG_NO_BUFFERING = 0x20000000;
 
     // ─── USN 原因掩码（过滤感兴趣的变更） ───
     internal const uint USN_REASON_FILE_CREATE = 0x00000100;
@@ -59,7 +58,7 @@ internal static class UsnApi
             FILE_SHARE_READ | FILE_SHARE_WRITE,
             IntPtr.Zero,
             OPEN_EXISTING,
-            FILE_FLAG_NO_BUFFERING,
+            0,  // 去掉 FILE_FLAG_NO_BUFFERING，避免扇区对齐问题
             IntPtr.Zero);
     }
 
@@ -119,22 +118,33 @@ internal static class UsnApi
                         outBuffer, (uint)outBufferSize,
                         out var bytesReturned,
                         IntPtr.Zero))
+                {
+                    var err = Marshal.GetLastWin32Error();
+                    AppLog.Warn("fname", $"[USN] Enumerate DeviceIoControl 失败, error={err}");
                     break;
+                }
+
+                AppLog.Info("fname", $"[USN] Enumerate 成功, bytes={bytesReturned}");
 
                 // 至少需要一个完整记录头
                 if (bytesReturned < minUsnHeaderSize)
+                {
+                    AppLog.Warn("fname", $"[USN] bytesReturned({bytesReturned}) < min({minUsnHeaderSize})");
                     break;
+                }
 
-                // 遍历解析变长 USN_RECORD 列表，同时跟踪最后一个有效记录
-                var offset = 0;
+                // 输出缓冲前 8 字节是下次起始 FRN，记录从偏移 8 开始
+                if (bytesReturned < 8 + minUsnHeaderSize)
+                {
+                    AppLog.Warn("fname", $"[USN] bytesReturned({bytesReturned}) < 8+min({minUsnHeaderSize})");
+                    break;
+                }
+
+                var offset = 8;
                 UsnRecord? lastValidRecord = null;
 
-                while (offset < bytesReturned)
+                while (offset + minUsnHeaderSize <= bytesReturned)
                 {
-                    // 安全边界：至少需要最小头部
-                    if (offset + minUsnHeaderSize > bytesReturned)
-                        break;
-
                     var record = MarshalUsnRecord(outBuffer + offset);
                     if (record.RecordLength == 0 || (int)record.RecordLength <= 0)
                         break;
@@ -155,20 +165,11 @@ internal static class UsnApi
                     offset += (int)record.RecordLength;
                 }
 
-                // 数据已全部读取
-                if (bytesReturned < outBufferSize)
-                    break;
+                // 继续枚举直到 DeviceIoControl 失败
 
-                // 用最后一条有效记录更新起始点，继续枚举
-                if (lastValidRecord is not null)
-                {
-                    enumData.StartFileReferenceNumber = lastValidRecord.FileReferenceNumber + 1;
-                    Marshal.StructureToPtr(enumData, inBuffer, false);
-                }
-                else
-                {
-                    break; // 没有读到任何有效记录
-                }
+                // 用输出缓冲前 8 字节更新下一次的起始 FRN
+                enumData.StartFileReferenceNumber = (ulong)Marshal.ReadInt64(outBuffer, 0);
+                Marshal.StructureToPtr(enumData, inBuffer, false);
             }
         }
         finally
@@ -191,7 +192,7 @@ internal static class UsnApi
             BytesToWaitFor = 0,
             UsnJournalID = journalId,
             MinMajorVersion = 2,
-            MaxMajorVersion = 2
+            MaxMajorVersion = 2  // 只请求 V2 记录（兼容当前解析代码）
         };
 
         var inBufSize = Marshal.SizeOf<ReadUsnJournalDataV0>();
@@ -213,11 +214,17 @@ internal static class UsnApi
                         outBuffer, (uint)outBufferSize,
                         out var bytesReturned,
                         IntPtr.Zero))
+                {
+                    var err = Marshal.GetLastWin32Error();
+                    AppLog.Warn("fname", $"[USN] ReadUsnJournal DeviceIoControl 失败, error={err}");
                     break;
+                }
 
-                if (bytesReturned < minUsnHeaderSize) break;
+                AppLog.Info("fname", $"[USN] ReadUsnJournal 返回 {bytesReturned} 字节");
+                // 前 8 字节是 NextUsn，记录数据从偏移 8 开始
+                if (bytesReturned < 8 + minUsnHeaderSize) break;
 
-                var offset = 0;
+                var offset = 8;
                 UsnRecord? lastValidRecord = null;
 
                 while (offset + minUsnHeaderSize <= bytesReturned)
@@ -242,16 +249,9 @@ internal static class UsnApi
                 if (bytesReturned < outBufferSize)
                     break;
 
-                // 用跟踪的最后一条记录更新 USN
-                if (lastValidRecord is not null)
-                {
-                    readData.StartUsn = lastValidRecord.Usn + 1;
-                    Marshal.StructureToPtr(readData, inBuffer, false);
-                }
-                else
-                {
-                    break;
-                }
+                // 用输出缓冲前 8 字节（NextUsn）更新起始 USN
+                readData.StartUsn = Marshal.ReadInt64(outBuffer, 0);
+                Marshal.StructureToPtr(readData, inBuffer, false);
             }
         }
         finally
@@ -267,16 +267,28 @@ internal static class UsnApi
         var recordLength = (uint)Marshal.ReadInt32(ptr, 0);
         var majorVersion = (ushort)Marshal.ReadInt16(ptr, 4);
         var minorVersion = (ushort)Marshal.ReadInt16(ptr, 6);
+
+        var isV3 = majorVersion >= 3;
+        var usnOff = isV3 ? 40 : 24;
+        var timeOff = isV3 ? 48 : 32;
+        var reasonOff = isV3 ? 56 : 40;
+        var fnLenOff = isV3 ? 72 : 56;
+        var fnOffOff = isV3 ? 74 : 58;
+        var pfRefOff = isV3 ? 24 : 16;
+
         var fileRefNumber = (ulong)Marshal.ReadInt64(ptr, 8);
-        var parentFileRefNumber = (ulong)Marshal.ReadInt64(ptr, 16);
-        var usn = Marshal.ReadInt64(ptr, 24);
-        var timeStamp = Marshal.ReadInt64(ptr, 32);
-        var reason = (uint)Marshal.ReadInt32(ptr, 40);
-        var sourceInfo = (uint)Marshal.ReadInt32(ptr, 44);
-        var securityId = (uint)Marshal.ReadInt32(ptr, 48);
-        var fileAttributes = (uint)Marshal.ReadInt32(ptr, 52);
-        var fileNameLength = (ushort)Marshal.ReadInt16(ptr, 56);
-        var fileNameOffset = (ushort)Marshal.ReadInt16(ptr, 58);
+        var parentFileRefNumber = (ulong)Marshal.ReadInt64(ptr, pfRefOff);
+        var usn = Marshal.ReadInt64(ptr, usnOff);
+        var timeStamp = Marshal.ReadInt64(ptr, timeOff);
+        DateTime ft;
+        try { ft = DateTime.FromFileTimeUtc(timeStamp); }
+        catch { ft = DateTime.MinValue; }
+        var reason = (uint)Marshal.ReadInt32(ptr, reasonOff);
+        var sourceInfo = (uint)Marshal.ReadInt32(ptr, reasonOff + 4);
+        var securityId = (uint)Marshal.ReadInt32(ptr, reasonOff + 8);
+        var fileAttributes = (uint)Marshal.ReadInt32(ptr, reasonOff + 12);
+        var fileNameLength = (ushort)Marshal.ReadInt16(ptr, fnLenOff);
+        var fileNameOffset = (ushort)Marshal.ReadInt16(ptr, fnOffOff);
 
         // 防止损坏记录导致越界读取 AccessViolationException
         const int minUsnHeaderSize = 60;
@@ -300,7 +312,7 @@ internal static class UsnApi
             FileReferenceNumber = fileRefNumber,
             ParentFileReferenceNumber = parentFileRefNumber,
             Usn = usn,
-            TimeStamp = DateTime.FromFileTimeUtc(timeStamp),
+            TimeStamp = ft,
             Reason = reason,
             SourceInfo = sourceInfo,
             SecurityId = securityId,
@@ -325,7 +337,7 @@ internal struct UsnJournalData
     public ulong AllocationDelta;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 internal struct MftEnumDataV0
 {
     public ulong StartFileReferenceNumber;
@@ -333,7 +345,7 @@ internal struct MftEnumDataV0
     public long HighUsn;
 }
 
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 internal struct ReadUsnJournalDataV0
 {
     public long StartUsn;

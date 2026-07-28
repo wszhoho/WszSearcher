@@ -7,6 +7,7 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
+    <PackageReference Include="ToolGood.Words" Version="3.1.0.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,7 +25,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+            <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+            <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">

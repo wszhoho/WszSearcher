@@ -49,17 +49,28 @@ public class SearchService : ISearchService, IDisposable
             // 同步更新文件名扫描的驱动器
             var drive = paths[0].Length > 0 ? paths[0][0] : 'C';
             _fileNameSearch.SetDrive(drive);
+            _fileNameSearch.SetFallbackPaths(paths);
         }
     }
 
-    /// <summary>设置内容索引的文件后缀</summary>
+    /// <summary>设置内容索引的文件后缀（文件名过滤暂默认关闭）</summary>
     public void SetContentExtensions(List<string> extensions)
     {
         _contentExts = extensions ?? [];
+        // 文件名后缀过滤暂时不启用（需要用户明确开启）
+        // _fileNameSearch.SetExtensionFilter(_contentExts);
     }
 
     /// <summary>文件名索引文件总数</summary>
-    public int FileNameIndexCount => _fileNameSearch.GetIndex().CountInPaths(_indexPaths);
+    public int FileNameIndexCount
+    {
+        get
+        {
+            var count = _fileNameSearch.GetIndex().CountInPaths(_indexPaths);
+            AppLog.Info("content", $"FileNameCount: 全盘={_fileNameSearch.IndexCount}, 过滤={count}, 路径={string.Join(",", _indexPaths)}");
+            return count;
+        }
+    }
 
     /// <summary>内容索引文档总数</summary>
     public int ContentIndexCount => _contentIndexer.IsReady
@@ -84,8 +95,8 @@ public class SearchService : ISearchService, IDisposable
             return;
         }
 
-        // 2. 内容索引：如果未建过索引，从设置的索引路径遍历文件
-        if (!_contentIndexer.IndexExists())
+        // 2. 内容索引：如果索引不存在或为空，则重建
+        if (!_contentIndexer.IndexExists() || _contentIndexer.TryGetDocCount() == 0)
         {
             StatusMessage?.Invoke("正在建立内容索引（首次使用需要几秒到几分钟）...");
             try
@@ -297,7 +308,7 @@ public class SearchService : ISearchService, IDisposable
                 var validPaths = _indexPaths;
                 fileNameResults = fileNameResults
                     .Where(r => validPaths.Any(p =>
-                        r.FullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+                        r.FullPath.StartsWith(p.EndsWith('\\') ? p : p + "\\", StringComparison.OrdinalIgnoreCase)))
                     .ToList();
 
                 // 按配置的后缀过滤内容搜索结果
@@ -341,8 +352,8 @@ public class SearchService : ISearchService, IDisposable
     /// <summary>从指定路径列表遍历文件（内容索引输入源），跳过重解析点和系统目录</summary>
     private IEnumerable<string> EnumerateFilesFromPaths(List<string> rootPaths)
     {
+        AppLog.Info("content", $"枚举开始: 路径={rootPaths.Count}, 后缀=[{string.Join(",", _contentExts)}]");
         var textExts = new HashSet<string>(_contentExts, StringComparer.OrdinalIgnoreCase);
-        Debug.WriteLine($"[ContentIndex] 路径数={rootPaths.Count}, 后缀数={_contentExts.Count}");
 
         var dirEnumOptions = new System.IO.EnumerationOptions
         {

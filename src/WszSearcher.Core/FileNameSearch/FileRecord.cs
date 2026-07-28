@@ -11,6 +11,10 @@ public class FileRecord
     public ulong FileReferenceNumber { get; set; }
     public ulong ParentFileReferenceNumber { get; set; }
     public bool IsDirectory { get; set; }
+    /// <summary>文件名拼音首字母，用于拼音搜索</summary>
+    public string NamePinyin { get; set; } = string.Empty;
+    /// <summary>文件名拼音全拼</summary>
+    public string NameFullPinyin { get; set; } = string.Empty;
 
     public string Extension => Path.GetExtension(FileName).TrimStart('.').ToLowerInvariant();
 

@@ -27,29 +27,31 @@ public class UsnFileScanner
     }
 
     /// <summary>执行全量扫描，返回文件记录列表</summary>
-    public async Task<List<FileRecord>> ScanAllAsync()
+    public async Task<List<FileRecord>> ScanAllAsync(List<string> fallbackPaths)
     {
-        return await Task.Run(() => ScanAll());
+        return await Task.Run(() => ScanAll(fallbackPaths));
     }
 
-    private List<FileRecord> ScanAll()
+    private List<FileRecord> ScanAll(List<string> fallbackPaths)
     {
         var result = new List<FileRecord>();
         var sw = Stopwatch.StartNew();
 
-        StatusChanged?.Invoke("打开卷设备...");
+        AppLog.Info("fname", $"USN 尝试打开卷: {_volume}");
         using var volumeHandle = UsnApi.OpenVolume(_volume);
         if (volumeHandle.IsInvalid)
         {
+            AppLog.Warn("fname", $"USN 无法打开卷 {_volume}（需要管理员权限）");
             StatusChanged?.Invoke($"无法访问卷 {_volume}，将使用目录遍历方式（需要管理员权限运行以获得最大速度）");
-            return FallbackScan();
+            return FallbackScan(fallbackPaths);
         }
 
-        StatusChanged?.Invoke("正在读取 USN Journal...");
+        AppLog.Info("fname", "USN 查询 Journal 信息...");
         if (!UsnApi.QueryUsnJournal(volumeHandle, out var journalData))
         {
+            AppLog.Warn("fname", "USN Journal 不可用");
             StatusChanged?.Invoke("USN Journal 不可用，使用目录遍历方式");
-            return FallbackScan();
+            return FallbackScan(fallbackPaths);
         }
 
         StatusChanged?.Invoke($"正在枚举 MFT 记录（USN范围: {journalData.FirstUsn} ~ {journalData.NextUsn}）...");
@@ -81,6 +83,13 @@ public class UsnFileScanner
         }
 
         StatusChanged?.Invoke($"MFT 扫描完成，共 {count} 条记录，正在解析路径...");
+        AppLog.Info("fname", $"USN 枚举完成: {count} 条记录");
+
+        if (count == 0)
+        {
+            AppLog.Warn("fname", "USN 枚举为 0，降级为目录遍历");
+            return FallbackScan(fallbackPaths);
+        }
 
         // Phase 2: 解析完整路径
         var resolved = 0;
@@ -98,6 +107,8 @@ public class UsnFileScanner
                     FileName = record.FileName,
                     FullPath = absolutePath,
                     Directory = Path.GetDirectoryName(absolutePath) ?? "",
+                    NamePinyin = Analysis.PinyinHelper.GetFirstLetters(record.FileName),
+                    NameFullPinyin = Analysis.PinyinHelper.GetPinyin(record.FileName),
                     LastModified = record.TimeStamp.ToLocalTime(),
                     FileReferenceNumber = frn,
                     ParentFileReferenceNumber = record.ParentFileReferenceNumber,
@@ -152,38 +163,41 @@ public class UsnFileScanner
         return string.Join("\\", pathSegments);
     }
 
-    /// <summary>备用方案：使用目录遍历（非管理员模式）</summary>
-    private List<FileRecord> FallbackScan()
-    {
-        var result = new List<FileRecord>();
-        var sw = Stopwatch.StartNew();
+    /// <summary>备用方案：从指定路径列表遍历（非管理员模式）</summary>
+	    public List<FileRecord> FallbackScan(List<string> rootPaths)
+	    {
+	        AppLog.Info("fname", $"Fallback 开始: {rootPaths.Count} 个路径 [{string.Join(", ", rootPaths)}]");
+	        var result = new List<FileRecord>();
+	        var sw = Stopwatch.StartNew();
 
-        var dirs = new Queue<string>();
-        dirs.Enqueue(_volumeRoot);
+	        foreach (var root in rootPaths)
+	        {
+	            if (!System.IO.Directory.Exists(root))
+	            {
+	                AppLog.Warn("fname", $"Fallback 路径不存在: {root}");
+	                continue;
+	            }
+	            AppLog.Info("fname", $"Fallback 遍历: {root}");
+	            var dirs = new Queue<string>();
+	            dirs.Enqueue(root);
 
-        while (dirs.Count > 0)
-        {
-            CancellationToken.ThrowIfCancellationRequested();
-
-            var dir = dirs.Dequeue();
-            try
-            {
-                var enumOptions = new EnumerationOptions
+                while (dirs.Count > 0)
                 {
-                    IgnoreInaccessible = true,
-                    AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System
-                };
-
-                foreach (var subDir in Directory.EnumerateDirectories(dir, "*", enumOptions))
+                    var dir = dirs.Dequeue();
+                    try
+                    {
+                        var subDirCount = 0;
+                foreach (var subDir in System.IO.Directory.EnumerateDirectories(dir, "*", new System.IO.EnumerationOptions
+                    { IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System }))
                 {
-                    // 额外检查：跳过以 . 开头的目录和常见的依赖目录
-                    var dirName = Path.GetFileName(subDir);
-                    if (dirName.StartsWith('.') || dirName == "node_modules" || dirName == ".git")
-                        continue;
-                    dirs.Enqueue(subDir);
+                    var dn = Path.GetFileName(subDir);
+                    if (dn.Length > 0 && dn[0] != '.' && dn is not "node_modules" and not ".git")
+                        dirs.Enqueue(subDir);
+                    subDirCount++;
                 }
 
-                foreach (var file in Directory.EnumerateFiles(dir))
+                var fileCount = 0;
+                foreach (var file in System.IO.Directory.EnumerateFiles(dir))
                 {
                     try
                     {
@@ -193,22 +207,26 @@ public class UsnFileScanner
                             FileName = fi.Name,
                             FullPath = fi.FullName,
                             Directory = fi.DirectoryName ?? "",
+                            NamePinyin = Analysis.PinyinHelper.GetFirstLetters(fi.Name),
+                            NameFullPinyin = Analysis.PinyinHelper.GetPinyin(fi.Name),
                             FileSize = fi.Length,
                             LastModified = fi.LastWriteTime,
                             IsDirectory = false
                         });
+                        fileCount++;
                     }
-                    catch { /* 跳过无权限访问的文件 */ }
+                    catch { }
                 }
+                if (subDirCount > 0 || fileCount > 0)
+                    AppLog.Info("fname", $"  目录 {dir}: {subDirCount} 子目录, {fileCount} 文件");
             }
-            catch { /* 跳过无权限访问的目录 */ }
-
-            if (result.Count % 1000 == 0)
-                StatusChanged?.Invoke($"正在遍历目录... 已找到 {result.Count} 个文件");
+            catch (Exception ex) { AppLog.Warn("fname", $"  遍历失败 {dir}: {ex.Message}"); }
         }
+    }
 
-        sw.Stop();
-        StatusChanged?.Invoke($"目录遍历完成！共 {result.Count} 个文件，耗时 {sw.Elapsed.TotalSeconds:F1} 秒");
+    sw.Stop();
+    AppLog.Info("fname", $"Fallback 完成: {result.Count} 个文件");
+    StatusChanged?.Invoke($"目录遍历完成！共 {result.Count} 个文件，耗时 {sw.Elapsed.TotalSeconds:F1} 秒");
         return result;
     }
 }

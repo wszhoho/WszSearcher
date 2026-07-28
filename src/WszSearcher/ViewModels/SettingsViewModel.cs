@@ -271,6 +271,10 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         // 设置全文索引后缀
         _searchService.SetContentExtensions(_settings.ContentIndexExtensions);
 
+        // 立即清零显示
+        FileNameCount = "0";
+        ContentCount = "0";
+
         try
         {
             await _searchService.RebuildIndexAsync();
@@ -302,8 +306,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         dispatcher.InvokeAsync(() =>
         {
             IsIndexing = status == SearchStatus.Indexing;
-            if (status == SearchStatus.Ready)
-                UpdateIndexCounts();
+            UpdateIndexCounts();
         });
     }
 
