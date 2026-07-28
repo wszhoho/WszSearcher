@@ -114,8 +114,13 @@ public class GlobalHotkeyService : IDisposable
     }
 
     /// <summary>检测快捷键是否冲突（使用独立 ID 避免与自身冲突）</summary>
-    public static bool CheckConflict(IntPtr hwnd, uint modifiers, uint key, int id = 1)
+    public static bool CheckConflict(IntPtr hwnd, uint modifiers, uint key,
+        uint currentModifiers, uint currentKey)
     {
+        // 与当前已注册的快捷键相同——就是自己，不冲突
+        if (modifiers == currentModifiers && key == currentKey)
+            return false;
+
         if (hwnd == IntPtr.Zero) return true;
 
         // 使用独立 ID 检测，避免与自身注册的快捷键冲突

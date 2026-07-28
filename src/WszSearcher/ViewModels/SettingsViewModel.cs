@@ -230,7 +230,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         if (mainWindow is null) return;
 
         var hwnd = new System.Windows.Interop.WindowInteropHelper(mainWindow).Handle;
-        var hasConflict = GlobalHotkeyService.CheckConflict(hwnd, modifiers, SelectedKey.Code);
+        var hasConflict = GlobalHotkeyService.CheckConflict(hwnd, modifiers, SelectedKey.Code,
+            _settings.HotkeyModifiers, _settings.HotkeyKey);
 
         if (hasConflict)
             System.Windows.MessageBox.Show($"快捷键 {HotkeyPreview} 已被其他程序占用，请更换", "快捷键冲突",

@@ -84,7 +84,7 @@ public partial class MainViewModel : ObservableObject
     private bool _hasSearched;
 
     [ObservableProperty]
-    private string _placeholderText = "请先在设置中重建索引，然后输入关键词搜索...";
+    private string _placeholderText = "请先设置索引目录，重建索引后开始搜索...";
 
     /// <summary>搜索输入变更时触发防抖</summary>
     partial void OnSearchTextChanged(string value)

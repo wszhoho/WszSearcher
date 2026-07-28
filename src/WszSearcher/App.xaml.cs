@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Windows;
 using WszSearcher.Core.Preview;
 using WszSearcher.Core.Search;
@@ -17,8 +18,21 @@ namespace WszSearcher;
     private AppSettings? _settings;
     private ISearchService? _searchService;
 
+    /// <summary>全局互斥体，确保单实例运行</summary>
+    private static Mutex? _singleInstanceMutex;
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        // 单实例检测
+        _singleInstanceMutex = new Mutex(true, @"Global\WszSearcher_SingleInstance", out bool createdNew);
+        if (!createdNew)
+        {
+            System.Windows.MessageBox.Show("WszSearcher 已在运行中，请检查系统托盘。",
+                "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            Current.Shutdown();
+            return;
+        }
+
         base.OnStartup(e);
 
         // 加载设置
@@ -138,7 +152,12 @@ namespace WszSearcher;
         Current.Shutdown();
     }
 
-    private void OnAppExit(object sender, ExitEventArgs e) => SaveSettings();
+    private void OnAppExit(object sender, ExitEventArgs e)
+    {
+        SaveSettings();
+        _singleInstanceMutex?.Close();
+        _singleInstanceMutex = null;
+    }
 
     private void ShowMainWindow()
     {
