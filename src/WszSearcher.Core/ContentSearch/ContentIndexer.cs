@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using WszSearcher.Core.ContentSearch.Parsers;
 using WszSearcher.Core.Analysis;
 using Lucene.Net.Documents;
@@ -84,50 +86,41 @@ public class ContentIndexer : IDisposable
         }
     }
 
-    /// <summary>全量重建索引（定期 commit 防止内存膨胀）</summary>
+    /// <summary>全量重建索引（并行处理，末尾单次 Commit）</summary>
     public async Task BuildFullIndexAsync(IEnumerable<string> filePaths, CancellationToken ct = default)
     {
-        AppLog.Info("content", $"BuildFullIndex 开始");
         IsReady = false;
         var writer = GetWriter();
 
-        // 清空旧索引
         writer.DeleteAll();
         writer.Commit();
 
         var handler = StatusChanged;
         handler?.Invoke("正在建立内容索引...");
         var sw = Stopwatch.StartNew();
+
+        var files = filePaths.ToList();
         var count = 0;
-        const int commitBatchSize = 200; // 每 200 个 commit
-        const int reportInterval = 50;  // 每 50 个报告进度
+        const int reportInterval = 50;
 
-        foreach (var filePath in filePaths)
+        await Task.Run(() =>
         {
-            ct.ThrowIfCancellationRequested();
-            try
+            Parallel.ForEach(files, new ParallelOptions
             {
-                await IndexFileAsync(writer, filePath, ct);
-            }
-            catch (Exception ex)
+                MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2),
+                CancellationToken = ct
+            }, filePath =>
             {
-                Debug.WriteLine($"索引跳过 [{filePath}]: {ex.Message}");
-            }
-            count++;
-
-            // 定期报告进度
-            if (count % reportInterval == 0)
-            {
-                var msgHandler = StatusChanged;
-                msgHandler?.Invoke($"内容索引中... 已处理 {count} 个文件");
-                var progHandler = ProgressChanged;
-                progHandler?.Invoke(count);
-            }
-
-            // 定期 commit 减少内存压力
-            if (count % commitBatchSize == 0)
-                writer.Commit();
-        }
+                ct.ThrowIfCancellationRequested();
+                try { IndexFileInternal(writer, filePath, skipDelete: true, ct); } catch { }
+                var n = Interlocked.Increment(ref count);
+                if (n % reportInterval == 0)
+                {
+                    var mh = StatusChanged; mh?.Invoke($"内容索引中... 已处理 {n} 个文件");
+                    var ph = ProgressChanged; ph?.Invoke(n);
+                }
+            });
+        }, ct);
 
         writer.Commit();
         DocCount = writer.NumDocs();
@@ -145,28 +138,35 @@ public class ContentIndexer : IDisposable
     }
 
     private async Task IndexFileAsync(IndexWriter writer, string filePath, CancellationToken ct)
+        => IndexFileInternal(writer, filePath, skipDelete: false, ct);
+
+    private void IndexFileInternal(IndexWriter writer, string filePath, bool skipDelete, CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         try
         {
-            var text = await _parsers.ExtractTextAsync(filePath, ct);
+            var text = _parsers.ExtractTextAsync(filePath, ct).GetAwaiter().GetResult();
             if (string.IsNullOrWhiteSpace(text)) return;
 
-            // 先构建文档，再原子性地删除旧记录 + 添加新记录，避免异常导致删除被孤立
             var doc = new Document();
             doc.Add(new Field("path", filePath, Field.Store.YES, Field.Index.NOT_ANALYZED));
             doc.Add(new Field("filename", Path.GetFileName(filePath), Field.Store.YES, Field.Index.ANALYZED));
             doc.Add(new Field("extension", Path.GetExtension(filePath).TrimStart('.').ToLowerInvariant(),
                 Field.Store.YES, Field.Index.NOT_ANALYZED));
             doc.Add(new Field("content", text, Field.Store.NO, Field.Index.ANALYZED));
-            // 拼音字段：首字母 + 全拼（Lucene 分词后都可搜索）
-            var py = Analysis.PinyinHelper.GetFirstLetters(text);
-            var fullPy = Analysis.PinyinHelper.GetPinyin(text);
-            var pinyin = string.IsNullOrEmpty(fullPy) ? py : $"{py} {fullPy}";
-            if (pinyin.Length > 0)
-                doc.Add(new Field("pinyin", pinyin, Field.Store.NO, Field.Index.ANALYZED));
 
-            // 原子操作：删除旧文档 + 添加新文档
-            writer.DeleteDocuments(new Term("path", filePath));
+            // 拼音字段：仅对含中文的文本转换
+            if (PinyinHelper.ContainsChinese(text))
+            {
+                var py = PinyinHelper.GetFirstLetters(text);
+                var fullPy = PinyinHelper.GetPinyin(text);
+                var pinyin = string.IsNullOrEmpty(fullPy) ? py : $"{py} {fullPy}";
+                if (pinyin.Length > 0)
+                    doc.Add(new Field("pinyin", pinyin, Field.Store.NO, Field.Index.ANALYZED));
+            }
+
+            if (!skipDelete)
+                writer.DeleteDocuments(new Term("path", filePath));
             writer.AddDocument(doc);
         }
         catch (Exception ex)
