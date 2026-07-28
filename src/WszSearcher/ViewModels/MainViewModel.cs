@@ -99,16 +99,20 @@ public partial class MainViewModel : ObservableObject
     {
         try
         {
-            // 获取新的 CancellationToken（线程安全）
+            // 原子地取消旧搜索并创建新令牌
+            CancellationTokenSource? oldCts;
             CancellationTokenSource newCts;
             lock (_searchLock)
             {
-                _searchCts?.Cancel();
-                _searchCts?.Dispose();
+                oldCts = _searchCts;
                 _searchCts = new CancellationTokenSource();
                 newCts = _searchCts;
             }
+            // 在锁外 Cancel/Dispose，防止回调中获取锁导致死锁
+            oldCts?.Cancel();
+            oldCts?.Dispose();
 
+            // 在 UI 线程读取搜索文本（避免跨线程访问属性）
             var query = SearchText;
             if (string.IsNullOrWhiteSpace(query))
             {
@@ -119,7 +123,7 @@ public partial class MainViewModel : ObservableObject
                     {
                         Results.Clear();
                         ResultCount = 0;
-                        HasSearched = false; // 回到初始状态
+                        HasSearched = false;
                     });
                 }
                 return;
@@ -129,7 +133,7 @@ public partial class MainViewModel : ObservableObject
             {
                 await _searchService.SearchAsync(query, newCts.Token);
             }
-            catch (OperationCanceledException) { /* 正常：被新搜索取消 */ }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 Debug.WriteLine($"搜索异常: {ex.Message}");
@@ -149,14 +153,27 @@ public partial class MainViewModel : ObservableObject
             PreviewContent = null;
             return;
         }
-        _ = LoadPreviewAsync(value.FullPath);
+        // 先关闭上一次预览（确保重新选中时 IsPreviewVisible 变化能触发事件）
+        IsPreviewVisible = false;
+        // 延迟加载预览，避免同步操作阻塞
+        System.Windows.Application.Current.Dispatcher.BeginInvoke(
+            new Action(() => _ = LoadPreviewAsync(value.FullPath)));
+
+        // 焦点还给搜索框（否则 ListBox 选中会抢走焦点，用户感觉"卡死"）
+        System.Windows.Application.Current.Dispatcher.BeginInvoke(
+            new Action(() =>
+            {
+                var w = System.Windows.Application.Current.MainWindow as MainWindow;
+                w?.FocusSearchBox();
+            }));
     }
 
     private async Task LoadPreviewAsync(string filePath)
     {
         try
         {
-            var result = await _previewService.GetPreviewAsync(filePath);
+            // 在后台线程执行文件读取，避免同步 IO 阻塞 UI 线程
+            var result = await Task.Run(() => _previewService.GetPreviewAsync(filePath));
             PreviewContent = result;
             IsPreviewVisible = true;
         }
@@ -220,6 +237,72 @@ public partial class MainViewModel : ObservableObject
         SelectedResult = null;
         IsPreviewVisible = false;
         PreviewContent = null;
+    }
+
+    /// <summary>直接打开文件</summary>
+    [RelayCommand]
+    private void OpenFile(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = filePath,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"打开文件失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>复制文件到剪贴板</summary>
+    [RelayCommand]
+    private void CopyFile(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return;
+        try
+        {
+            System.Windows.Clipboard.SetFileDropList(
+                new System.Collections.Specialized.StringCollection { filePath });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"复制文件失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>复制文件名到剪贴板</summary>
+    [RelayCommand]
+    private void CopyFileName(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return;
+        try
+        {
+            var name = Path.GetFileName(filePath);
+            System.Windows.Clipboard.SetText(name);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"复制文件名失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>在资源管理器中打开文件所在目录并选中文件</summary>
+    [RelayCommand]
+    private void OpenFileLocation(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return;
+        try
+        {
+            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"打开文件位置失败: {ex.Message}");
+        }
     }
 
     [RelayCommand]

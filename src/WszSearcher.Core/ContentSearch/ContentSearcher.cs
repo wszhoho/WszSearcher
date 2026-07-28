@@ -21,7 +21,8 @@ public class ContentSearcher : IDisposable
     public ContentSearcher(string? indexPath = null)
     {
         _indexPath = indexPath ?? Path.Combine(
-            AppContext.BaseDirectory, "Index");
+            Path.GetDirectoryName(AppContext.BaseDirectory) ?? ".",
+            "Index");
 
         _directory = FSDirectory.Open(_indexPath);
         _analyzer = new JiebaAnalyzer();
@@ -69,14 +70,17 @@ public class ContentSearcher : IDisposable
 
                 var fileName = doc.Get("filename") ?? Path.GetFileName(filePath);
 
+                var score = float.IsNaN(hit.Score) ? 0f : hit.Score;
                 results.Add(new SearchResult
                 {
                     FileName = fileName,
                     FullPath = filePath,
                     Directory = Path.GetDirectoryName(filePath) ?? "",
+                    FileSize = GetFileSize(filePath),
+                    LastModified = GetLastModified(filePath),
                     ResultType = SearchResultType.Content,
-                    MatchSnippet = $"[内容匹配] 相关度: {hit.Score:F2}",
-                    Score = hit.Score
+                    MatchSnippet = $"[内容匹配] 相关度: {score:F2}",
+                    Score = score
                 });
             }
         }
@@ -92,7 +96,8 @@ public class ContentSearcher : IDisposable
     public static bool CheckIndexExists(string? indexPath = null)
     {
         indexPath ??= Path.Combine(
-            AppContext.BaseDirectory, "Index");
+            Path.GetDirectoryName(AppContext.BaseDirectory) ?? ".",
+            "Index");
 
         try
         {
@@ -111,5 +116,17 @@ public class ContentSearcher : IDisposable
         _disposed = true;
         _analyzer.Dispose();
         _directory.Dispose();
+    }
+
+    private static long GetFileSize(string path)
+    {
+        try { return new FileInfo(path).Length; }
+        catch { return 0; }
+    }
+
+    private static DateTime GetLastModified(string path)
+    {
+        try { return new FileInfo(path).LastWriteTime; }
+        catch { return DateTime.MinValue; }
     }
 }

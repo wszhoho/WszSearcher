@@ -28,8 +28,14 @@ public partial class MainWindow : Window
     private const int HTBOTTOMLEFT = 16;
     private const int HTBOTTOMRIGHT = 17;
     private const int ResizeMargin = 6; // 边缘调整大小灵敏度
-    private const double CollapsedHeight = 64;  // 折叠时仅搜索栏（48px 搜索框 + 边距）
-    private double _expandedHeight;             // 展开时的窗口高度
+    private const double CollapsedHeight = 52;  // 搜索框 48px + Grid margin 上下各 2px
+    private const double RowHeightPerItem = 58;   // 每条结果项约 58px
+    private const double ResultHeaderHeight = 34; // 结果数量提示栏
+    private const int MaxVisibleRows = 6;         // 最多显示 6 行
+    private const double MaxResultHeight = RowHeightPerItem * MaxVisibleRows + ResultHeaderHeight;
+
+    private double _expandedHeight;
+    private bool _isExpanded; // 本地缓存避免重复计算
 
     public MainWindow(MainViewModel viewModel, AppSettings settings)
     {
@@ -44,9 +50,16 @@ public partial class MainWindow : Window
             Left = _settings.WindowLeft.Value;
             Top = _settings.WindowTop.Value;
         }
-        Width = _settings.WindowWidth;
-        _expandedHeight = _settings.WindowHeight;
-        Height = _viewModel.IsExpanded ? _expandedHeight : CollapsedHeight; // 初始折叠
+        else
+        {
+            // 默认位置：水平居中，垂直距顶部 1/3
+            Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
+            Top = SystemParameters.PrimaryScreenHeight / 3;
+        }
+        // 若设置中还是旧默认值（用户从未调整过），使用新的默认值
+        if (_settings.WindowWidth == 760) _settings.WindowWidth = 560;
+        Width = Math.Clamp(_settings.WindowWidth, 400, 1200);
+        Height = CollapsedHeight; // 初始折叠，仅搜索栏
 
         // 监听 ViewModel 的 IsExpanded 变化以动态调整窗口高度
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
@@ -66,24 +79,56 @@ public partial class MainWindow : Window
         SourceInitialized += OnSourceInitialized;
     }
 
-    /// <summary>监听 IsExpanded 变化，动态折叠/展开窗口</summary>
+    /// <summary>监听 IsExpanded/ResultCount 变化，动态调整窗口</summary>
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(MainViewModel.IsExpanded)) return;
-
-        if (_viewModel.IsExpanded && Height < _expandedHeight - 10)
+        if (e.PropertyName == nameof(MainViewModel.IsExpanded))
         {
-            // 保存当前窗口高度以便恢复
-            if (Height > CollapsedHeight + 10) _expandedHeight = Height;
-            Height = _expandedHeight;
+            if (_viewModel.IsExpanded && !_isExpanded)
+            {
+                _isExpanded = true;
+                ResultRow.Height = new GridLength(1, GridUnitType.Star);
+                SearchBarBorder.CornerRadius = new CornerRadius(8, 8, 0, 0);
+                SearchBarBorder.BorderThickness = new Thickness(0, 0, 0, 1); // 底部边框分割线
+                AdjustExpandedHeight();
+            }
+        }
+        else if (e.PropertyName == nameof(MainViewModel.ResultCount))
+        {
+            if (_isExpanded) AdjustExpandedHeight();
         }
     }
 
-    /// <summary>窗口初始化后添加 WndProc 钩子处理拖动和调整大小</summary>
+    /// <summary>根据结果数量自适应窗口高度</summary>
+    private void AdjustExpandedHeight()
+    {
+        var count = _viewModel.ResultCount;
+        var resultHeight = count <= 0 ? MaxResultHeight
+            : Math.Min(RowHeightPerItem * count + ResultHeaderHeight, MaxResultHeight);
+
+        _expandedHeight = CollapsedHeight + resultHeight + 16; // 16px 窗口边距
+        Height = _expandedHeight;
+    }
+
+    /// <summary>窗口初始化后添加钩子，并设置圆角裁剪</summary>
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
         var source = (HwndSource)PresentationSource.FromVisual(this)!;
         source.AddHook(WndProcHitTest);
+
+        // 圆角裁剪：用 RectangleGeometry 裁剪窗口
+        UpdateWindowClip();
+        SizeChanged += (_, _) => UpdateWindowClip();
+    }
+
+    private void UpdateWindowClip()
+    {
+        if (ActualWidth > 0 && ActualHeight > 0)
+        {
+            Clip = new RectangleGeometry(
+                new System.Windows.Rect(0, 0, ActualWidth, ActualHeight),
+                10, 10); // 10px 圆角
+        }
     }
 
     /// <summary>处理 WM_NCHITTEST：自定义无边框窗口的拖动区和调整大小区</summary>
@@ -118,7 +163,7 @@ public partial class MainWindow : Window
 
         // 搜索栏区域作为拖动区（但排除关闭按钮）
         // 关闭按钮位置：右侧 32px 宽，搜索栏顶部
-        var closeBtnLeft = w - 12 - 48; // 外 Margin(12) + 按钮宽(48)
+        var closeBtnLeft = w - 2 - 48; // 外 Margin(2) + 按钮宽(48)
         var inCloseButton = clientPoint.X >= closeBtnLeft && clientPoint.Y <= CollapsedHeight;
 
         if (clientPoint.Y <= CollapsedHeight && !inCloseButton)
@@ -198,6 +243,17 @@ public partial class MainWindow : Window
                 ShowWindow();
             }
         });
+    }
+
+    /// <summary>右键点击时先选中该项，确保 ContextMenu 操作正确的文件</summary>
+    private void OnResultListRightClick(object sender, MouseButtonEventArgs e)
+    {
+        var dep = e.OriginalSource as DependencyObject;
+        while (dep is not null && dep is not System.Windows.Controls.ListBoxItem)
+            dep = VisualTreeHelper.GetParent(dep);
+
+        if (dep is System.Windows.Controls.ListBoxItem item)
+            item.IsSelected = true;
     }
 
     /// <summary>显示窗口并定位到屏幕顶部中央</summary>

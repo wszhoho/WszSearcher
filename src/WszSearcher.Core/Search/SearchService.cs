@@ -166,42 +166,52 @@ public class SearchService : ISearchService, IDisposable
         Status = SearchStatus.Searching;
         StatusChanged?.Invoke(Status);
 
-        // 包装为 Task.Run 实现真正的异步，不阻塞 UI
-        var results = await Task.Run(() =>
+        try
         {
-            ct.ThrowIfCancellationRequested();
-
-            var fileNameResults = _fileNameSearch.Search(query, maxResults: 30);
-            var contentResults = _contentSearcher?.Search(query, maxResults: 20) ?? [];
-
-            // 按索引路径过滤文件名搜索结果（USN 是全盘扫描的）
-            var validPaths = _indexPaths;
-            fileNameResults = fileNameResults
-                .Where(r => validPaths.Any(p =>
-                    r.FullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-
-            // HashSet 去重（替代之前的 List.Contains O(n²)）
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var merged = new List<SearchResult>();
-
-            foreach (var r in fileNameResults)
+            // 包装为 Task.Run 实现真正的异步，不阻塞 UI
+            var results = await Task.Run(() =>
             {
-                if (seen.Add(r.FullPath))
-                    merged.Add(r);
-            }
-            foreach (var r in contentResults)
-            {
-                if (seen.Add(r.FullPath))
-                    merged.Add(r);
-            }
+                ct.ThrowIfCancellationRequested();
 
-            return (IReadOnlyList<SearchResult>)merged;
-        }, ct);
+                var fileNameResults = _fileNameSearch.Search(query, maxResults: 30);
+                var contentResults = _contentSearcher?.Search(query, maxResults: 20) ?? [];
 
-        Status = SearchStatus.Ready;
-        StatusChanged?.Invoke(Status);
-        ResultsUpdated?.Invoke(results);
+                // 按索引路径过滤文件名搜索结果（USN 是全盘扫描的）
+                var validPaths = _indexPaths;
+                fileNameResults = fileNameResults
+                    .Where(r => validPaths.Any(p =>
+                        r.FullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+
+                // HashSet 去重
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var merged = new List<SearchResult>();
+
+                foreach (var r in fileNameResults)
+                {
+                    if (seen.Add(r.FullPath))
+                        merged.Add(r);
+                }
+                foreach (var r in contentResults)
+                {
+                    if (seen.Add(r.FullPath))
+                        merged.Add(r);
+                }
+
+                return (IReadOnlyList<SearchResult>)merged;
+            }, ct);
+
+            ResultsUpdated?.Invoke(results);
+        }
+        catch (OperationCanceledException)
+        {
+            // 被新搜索取消，静默
+        }
+        finally
+        {
+            Status = SearchStatus.Ready;
+            StatusChanged?.Invoke(Status);
+        }
     }
 
     /// <summary>从指定路径列表遍历文件（内容索引输入源），跳过重解析点和系统目录</summary>

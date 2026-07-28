@@ -6,7 +6,6 @@
         MinWidth="280" MinHeight="200"
         WindowStyle="ToolWindow"
         ResizeMode="CanResize"
-        Topmost="True"
         ShowInTaskbar="False"
         Background="{DynamicResource SurfaceBrush}">
 

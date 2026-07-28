@@ -11,12 +11,10 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        Topmost="True"
         ShowInTaskbar="False"
-        Width="760"
-        Height="560"
-        MinWidth="480" MinHeight="360"
-        WindowStartupLocation="CenterScreen"
+        Width="560"
+        MinWidth="480" MinHeight="48"
+        WindowStartupLocation="Manual"
         ResizeMode="CanResize">
 
     <Window.Resources>
@@ -30,38 +28,18 @@
     </Window.Resources>
 
     <!-- 主容器：圆角阴影浮层 -->
-    <Border Margin="12"
-            CornerRadius="8"
-            Background="{DynamicResource SurfaceBrush}"
-            BorderBrush="{DynamicResource BorderBrush}"
-            BorderThickness="1">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="24" Opacity="0.3" ShadowDepth="4" Color="#000000" />
-        </Border.Effect>
-
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />   <!-- 搜索栏 -->
-                <RowDefinition>                    <!-- 结果区（折叠时归零） -->
-                    <RowDefinition.Style>
-                        <Style TargetType="RowDefinition">
-                            <Setter Property="Height" Value="0" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsExpanded}" Value="True">
-                                    <Setter Property="Height" Value="*" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </RowDefinition.Style>
-                </RowDefinition>
-            </Grid.RowDefinitions>
+    <Grid Margin="2" Background="{DynamicResource SurfaceBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition x:Name="ResultRow" Height="0" />
+        </Grid.RowDefinitions>
 
             <!-- ═══ 搜索栏 ═══ -->
-            <Border Grid.Row="0"
+            <Border x:Name="SearchBarBorder" Grid.Row="0"
                     BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="0,0,0,1"
+                    BorderThickness="0"
                     Background="{DynamicResource SurfaceBrush}"
-                    CornerRadius="8,8,0,0"
+                    CornerRadius="8"
                     MouseLeftButtonDown="OnTitleBarMouseDown">
                 <DockPanel LastChildFill="True">
                     <!-- 关闭按钮 -->
@@ -203,7 +181,26 @@
                              Style="{StaticResource ResultListBox}"
                              VirtualizingStackPanel.IsVirtualizing="True"
                              VirtualizingStackPanel.VirtualizationMode="Standard"
-                             ScrollViewer.CanContentScroll="True">
+                             ScrollViewer.CanContentScroll="True"
+                             PreviewMouseRightButtonDown="OnResultListRightClick">
+                        <ListBox.ContextMenu>
+                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext,
+                                RelativeSource={RelativeSource Self}}">
+                                <MenuItem Header="打开文件"
+                                          Command="{Binding OpenFileCommand}"
+                                          CommandParameter="{Binding SelectedResult.FullPath}" />
+                                <MenuItem Header="打开文件位置"
+                                          Command="{Binding OpenFileLocationCommand}"
+                                          CommandParameter="{Binding SelectedResult.FullPath}" />
+                                <Separator />
+                                <MenuItem Header="复制文件"
+                                          Command="{Binding CopyFileCommand}"
+                                          CommandParameter="{Binding SelectedResult.FullPath}" />
+                                <MenuItem Header="复制文件名"
+                                          Command="{Binding CopyFileNameCommand}"
+                                          CommandParameter="{Binding SelectedResult.FullPath}" />
+                            </ContextMenu>
+                        </ListBox.ContextMenu>
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type vm:SearchResultViewModel}">
                                 <Grid Margin="0,2">
@@ -267,6 +264,5 @@
                            VerticalAlignment="Center"
                            Visibility="{Binding HasNoResults, Converter={StaticResource BoolToVis}}" />
             </Grid>
-        </Grid>
-    </Border>
+    </Grid>
 </Window>

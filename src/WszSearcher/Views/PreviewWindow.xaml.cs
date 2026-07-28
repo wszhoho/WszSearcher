@@ -3,13 +3,12 @@ using WszSearcher.ViewModels;
 
 namespace WszSearcher.Views;
 
-/// <summary>浮动预览窗口——吸附到主窗口右侧，手动拖离后保持脱离</summary>
 public partial class PreviewWindow : Window
 {
     private Window? _ownerWindow;
     private bool _isSnapped = true;
-    private const int Gap = 8;
-    private bool _suppressLocationChanged; // 防止自己移动时触发检测循环
+    private bool _suppress; // 抑制 LocationChanged 循环
+    private const int SnapGap = 0;
 
     public PreviewWindow(MainViewModel viewModel)
     {
@@ -17,6 +16,15 @@ public partial class PreviewWindow : Window
         DataContext = viewModel;
         Visibility = Visibility.Collapsed;
         LocationChanged += OnLocationChanged;
+
+        // 拦截关闭事件：隐藏而非销毁，以便下次重新 Show()
+        Closing += (_, e) =>
+        {
+            e.Cancel = true;
+            Hide();
+            if (DataContext is MainViewModel vm)
+                vm.IsPreviewVisible = false;
+        };
     }
 
     public void SetOwnerWindow(Window owner)
@@ -29,23 +37,12 @@ public partial class PreviewWindow : Window
             _ownerWindow.LocationChanged += (_, _) =>
             {
                 if (_isSnapped && Visibility == Visibility.Visible)
-                {
-                    _suppressLocationChanged = true;
-                    Left = _ownerWindow.Left + _ownerWindow.ActualWidth + Gap;
-                    Top = _ownerWindow.Top;
-                    _suppressLocationChanged = false;
-                }
+                    MoveToOwner();
             };
             _ownerWindow.SizeChanged += (_, _) =>
             {
                 if (_isSnapped && Visibility == Visibility.Visible)
-                {
-                    _suppressLocationChanged = true;
-                    Left = _ownerWindow.Left + _ownerWindow.ActualWidth + Gap;
-                    Top = _ownerWindow.Top;
-                    Height = _ownerWindow.ActualHeight;
-                    _suppressLocationChanged = false;
-                }
+                    MoveToOwner();
             };
         }
     }
@@ -54,29 +51,39 @@ public partial class PreviewWindow : Window
     {
         if (_ownerWindow is null) return;
         _isSnapped = true;
-        _suppressLocationChanged = true;
-        Left = _ownerWindow.Left + _ownerWindow.ActualWidth + Gap;
-        Top = _ownerWindow.Top;
-        Height = _ownerWindow.ActualHeight;
-        _suppressLocationChanged = false;
-
-        if (Visibility != Visibility.Visible)
-            Show();
-        Activate();
+        MoveToOwner();
+        if (Visibility != Visibility.Visible) Show();
     }
 
-    /// <summary>用户手动拖动窗口 → 脱离吸附</summary>
+    private void MoveToOwner()
+    {
+        if (_ownerWindow is null) return;
+        _suppress = true;
+        Left = Math.Round(_ownerWindow.Left + _ownerWindow.ActualWidth + SnapGap);
+        Top = Math.Round(_ownerWindow.Top);
+        Height = Math.Round(_ownerWindow.ActualHeight);
+        _suppress = false;
+    }
+
     private void OnLocationChanged(object? sender, EventArgs e)
     {
-        if (_suppressLocationChanged || !_isSnapped) return;
-        // 程序自己移动窗口时 suppress 为 true，不会执行到这里。
-        // 只有用户手动拖动才会触发 → 脱离吸附。
-        _isSnapped = false;
-    }
+        if (_suppress || _ownerWindow is null) return; // 程序移动 → 跳过
 
-    protected override void OnClosed(EventArgs e)
-    {
-        _ownerWindow = null;
-        base.OnClosed(e);
+        var expectedLeft = Math.Round(_ownerWindow.Left + _ownerWindow.ActualWidth + SnapGap);
+        var expectedTop = Math.Round(_ownerWindow.Top);
+        var distX = Math.Abs(Left - expectedLeft);
+        var distY = Math.Abs(Top - expectedTop);
+
+        if (!_isSnapped && distX <= 15 && distY <= 15)
+        {
+            // 用户拖回主窗口附近 → 重新吸附
+            _isSnapped = true;
+            MoveToOwner();
+        }
+        else if (_isSnapped && (distX > 2 || distY > 2))
+        {
+            // 用户拖离 → 脱离吸附
+            _isSnapped = false;
+        }
     }
 }

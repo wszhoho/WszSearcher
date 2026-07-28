@@ -37,12 +37,14 @@ public class ContentIndexer : IDisposable
     public ContentIndexer(string? indexPath = null)
     {
         _indexPath = indexPath ?? Path.Combine(
-            AppContext.BaseDirectory, "Index");
+            Path.GetDirectoryName(AppContext.BaseDirectory) ?? ".",
+            "Index");
 
         System.IO.Directory.CreateDirectory(_indexPath);
         _parsers = new ParserRegistry();
         _directory = FSDirectory.Open(_indexPath);
         _analyzer = new JiebaAnalyzer();
+        Debug.WriteLine($"[ContentIndexer] 索引路径: {_indexPath}");
     }
 
     /// <summary>打开或创建 IndexWriter（线程安全）</summary>
@@ -175,14 +177,18 @@ public class ContentIndexer : IDisposable
     {
         try
         {
-            return IndexReader.IndexExists(_directory);
+            var exists = IndexReader.IndexExists(_directory);
+            Debug.WriteLine($"[IndexExists] 路径={_indexPath}, 结果={exists}");
+            return exists;
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            Debug.WriteLine($"[IndexExists] IOException: {ex.Message}");
             return false;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            Debug.WriteLine($"[IndexExists] UnauthorizedAccess: {ex.Message}");
             return false;
         }
     }

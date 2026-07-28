@@ -4,18 +4,17 @@ using System.Text.Json;
 
 namespace WszSearcher.Services;
 
-/// <summary>应用设置——持久化到用户 AppData 目录</summary>
+/// <summary>应用设置——持久化到 exe 同目录（绿色版，不侵入系统）</summary>
 public class AppSettings
 {
-    private static readonly string SettingsDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "WszSearcher");
-    private static readonly string SettingsPath = Path.Combine(SettingsDir, "settings.json");
+    private static readonly string SettingsPath = Path.Combine(
+        Path.GetDirectoryName(AppContext.BaseDirectory) ?? ".",
+        "settings.json");
     private static readonly object _saveLock = new(); // 防止并发写入
 
     // ─── 可持久化属性 ───
 
-    public double WindowWidth { get; set; } = 760;
+    public double WindowWidth { get; set; } = 560;
     public double WindowHeight { get; set; } = 560;
     public double? WindowLeft { get; set; }
     public double? WindowTop { get; set; }
@@ -65,7 +64,6 @@ public class AppSettings
         {
             lock (_saveLock)
             {
-                Directory.CreateDirectory(SettingsDir);
                 var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(SettingsPath, json, Encoding.UTF8);
             }
