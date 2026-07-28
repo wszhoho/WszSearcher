@@ -228,7 +228,7 @@ public partial class MainViewModel : ObservableObject
             {
                 SearchStatus.Indexing => "正在建立索引...",
                 SearchStatus.Ready => "Alt+Space 呼出 · 输入关键词搜索...",
-                _ => "请先在设置中重建索引后搜索..."
+                _ => "请先设置索引目录，重建索引后开始搜索..."
             };
         });
     }
