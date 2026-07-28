@@ -293,15 +293,8 @@ public class SearchService : ISearchService, IDisposable
             {
                 ct.ThrowIfCancellationRequested();
 
-                var fileNameResults = _fileNameSearch.Search(query, maxResults: 30);
+                var fileNameResults = _fileNameSearch.Search(query, _indexPaths, maxResults: 30);
                 var contentResults = _contentSearcher?.Search(query, maxResults: 20) ?? [];
-
-                // 按索引路径过滤文件名搜索结果（USN 是全盘扫描的）
-                var validPaths = _indexPaths;
-                fileNameResults = fileNameResults
-                    .Where(r => validPaths.Any(p =>
-                        r.FullPath.StartsWith(p.EndsWith('\\') ? p : p + "\\", StringComparison.OrdinalIgnoreCase)))
-                    .ToList();
 
                 // 按配置的后缀过滤内容搜索结果
                 var validExts = new HashSet<string>(_contentExts, StringComparer.OrdinalIgnoreCase);

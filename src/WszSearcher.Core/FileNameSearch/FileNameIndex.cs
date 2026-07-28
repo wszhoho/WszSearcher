@@ -102,23 +102,38 @@ public class FileNameIndex : IDisposable
         }
     }
 
-    /// <summary>搜索文件名——前缀匹配优先，包含匹配次之（快照模式，不长时间持有锁）</summary>
-    public List<FileRecord> Search(string query, int maxResults = 50)
+    /// <summary>搜索文件名（仅在指定路径范围内）</summary>
+    public List<FileRecord> Search(string query, IReadOnlyList<string> paths, int maxResults = 50)
     {
         if (string.IsNullOrWhiteSpace(query) || !_isReady)
             return [];
 
-        // 快照复制：只在锁内做浅拷贝（O(1) 复制引用列表），避免阻塞写操作
         List<FileRecord> snapshot;
         _lock.EnterReadLock();
         try
         {
-            snapshot = new List<FileRecord>(_allFiles);
+            if (paths.Count == 0)
+                snapshot = new List<FileRecord>(_allFiles);
+            else
+            {
+                var ps = paths.Select(p => p.EndsWith('\\') ? p : p + "\\").ToList();
+                snapshot = _allFiles.Where(f => ps.Any(p =>
+                    f.FullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase))).ToList();
+            }
         }
-        finally
-        {
-            _lock.ExitReadLock();
-        }
+        finally { _lock.ExitReadLock(); }
+
+        return SearchCore(query, snapshot, maxResults);
+    }
+
+    /// <summary>搜索文件名（全盘，向后兼容）</summary>
+    public List<FileRecord> Search(string query, int maxResults = 50)
+    {
+        return Search(query, Array.Empty<string>(), maxResults);
+    }
+
+    private List<FileRecord> SearchCore(string query, List<FileRecord> snapshot, int maxResults)
+    {
 
         // 在快照上搜索，不持有锁
         var q = query.Trim();

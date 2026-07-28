@@ -138,12 +138,12 @@ public class FileNameSearchProvider : IDisposable
     }
 
     /// <summary>搜索文件名</summary>
-    public List<SearchResult> Search(string query, int maxResults = 50)
+    public List<SearchResult> Search(string query, IReadOnlyList<string>? paths = null, int maxResults = 50)
     {
         if (string.IsNullOrWhiteSpace(query) || State != IndexState.Ready)
             return [];
 
-        var files = _index.Search(query, maxResults);
+        var files = _index.Search(query, paths ?? Array.Empty<string>(), maxResults);
         return files.Select(f => new SearchResult
         {
             FileName = f.FileName,
