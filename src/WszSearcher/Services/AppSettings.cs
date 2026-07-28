@@ -59,7 +59,17 @@ public class AppSettings
                 return new AppSettings();
 
             var json = File.ReadAllText(SettingsPath, Encoding.UTF8);
-            return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            // 防御旧设置文件缺失字段导致的 null
+            settings.IndexPaths ??= [];
+            settings.ExcludePaths ??= [];
+            settings.ContentIndexExtensions ??= [
+                "txt", "md", "csv", "log", "json", "xml", "yaml", "yml",
+                "cs", "js", "ts", "html", "css", "py", "cpp", "c", "h",
+                "pdf", "docx", "xlsx", "pptx",
+                "ini", "cfg", "config", "java", "rs", "go", "php"
+            ];
+            return settings;
         }
         catch
         {

@@ -11,8 +11,13 @@
         Background="{DynamicResource SurfaceBrush}">
 
     <Window.Resources>
-        <!-- 分组标题样式 -->
-        <Style x:Key="SectionTitle" TargetType="TextBlock">
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Styles/Theme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- 分组标题样式 -->
+            <Style x:Key="SectionTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
@@ -119,7 +124,8 @@
             <Setter Property="CaretBrush" Value="{DynamicResource PrimaryBrush}" />
             <Setter Property="FontSize" Value="13" />
         </Style>
-    </Window.Resources>
+    </ResourceDictionary>
+</Window.Resources>
 
     <Grid Margin="24">
         <Grid.RowDefinitions>

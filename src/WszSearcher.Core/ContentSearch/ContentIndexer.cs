@@ -24,6 +24,8 @@ public class ContentIndexer : IDisposable
 
     /// <summary>索引状态事件</summary>
     public event Action<string>? StatusChanged;
+    /// <summary>索引进度（文件计数）</summary>
+    public event Action<int>? ProgressChanged;
 
     /// <summary>当前索引中的文档总数</summary>
     public int DocCount { get; private set; }
@@ -79,7 +81,8 @@ public class ContentIndexer : IDisposable
         handler?.Invoke("正在建立内容索引...");
         var sw = Stopwatch.StartNew();
         var count = 0;
-        const int commitBatchSize = 500; // 每 500 个文件 commit 一次，释放 Lucene 内存
+        const int commitBatchSize = 200; // 每 200 个 commit
+        const int reportInterval = 50;  // 每 50 个报告进度
 
         foreach (var filePath in filePaths)
         {
@@ -94,13 +97,18 @@ public class ContentIndexer : IDisposable
             }
             count++;
 
+            // 定期报告进度
+            if (count % reportInterval == 0)
+            {
+                var msgHandler = StatusChanged;
+                msgHandler?.Invoke($"内容索引中... 已处理 {count} 个文件");
+                var progHandler = ProgressChanged;
+                progHandler?.Invoke(count);
+            }
+
             // 定期 commit 减少内存压力
             if (count % commitBatchSize == 0)
-            {
                 writer.Commit();
-                handler = StatusChanged;
-                handler?.Invoke($"内容索引中... 已处理 {count} 个文件");
-            }
         }
 
         writer.Commit();
@@ -178,7 +186,13 @@ public class ContentIndexer : IDisposable
         try
         {
             var exists = IndexReader.IndexExists(_directory);
-            Debug.WriteLine($"[IndexExists] 路径={_indexPath}, 结果={exists}");
+            Debug.WriteLine($"[IndexExists] 路径={_indexPath}, 目录存在={System.IO.Directory.Exists(_indexPath)}, 索引={exists}");
+            if (!exists && System.IO.Directory.Exists(_indexPath))
+            {
+                // 目录存在但 Lucene 认为无索引，列出文件帮助诊断
+                foreach (var f in System.IO.Directory.GetFiles(_indexPath).Take(10))
+                    Debug.WriteLine($"  {System.IO.Path.GetFileName(f)}");
+            }
             return exists;
         }
         catch (IOException ex)

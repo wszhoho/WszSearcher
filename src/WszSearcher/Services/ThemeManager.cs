@@ -41,13 +41,19 @@ public static class ThemeManager
     {
         IsDarkMode = darkMode;
 
+        var app = System.Windows.Application.Current;
         // 更新 Application 层资源
-        ApplyColors(System.Windows.Application.Current?.Resources, darkMode);
+        ApplyColors(app?.Resources, darkMode);
 
-        // 更新 MainWindow 本地资源（如果 Window 有独立 MergedDictionaries）
-        var mainWindow = System.Windows.Application.Current?.MainWindow;
-        if (mainWindow is not null && mainWindow.Resources != System.Windows.Application.Current?.Resources)
-            ApplyColors(mainWindow.Resources, darkMode);
+        // 更新所有已打开窗口的本地资源
+        if (app is not null)
+        {
+            foreach (System.Windows.Window window in app.Windows)
+            {
+                if (window.Resources != app.Resources)
+                    ApplyColors(window.Resources, darkMode);
+            }
+        }
     }
 
     /// <summary>向指定 ResourceDictionary 写入主题颜色</summary>

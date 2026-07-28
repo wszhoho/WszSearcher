@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using WszSearcher.Core.ContentSearch;
 using WszSearcher.Core.FileNameSearch;
 using WszSearcher.Core.Models;
@@ -25,6 +26,8 @@ public class SearchService : ISearchService, IDisposable
         _fileNameSearch.ProgressChanged += count => ProgressChanged?.Invoke(count);
 
         _contentIndexer = new ContentIndexer();
+        _contentIndexer.StatusChanged += msg => StatusMessage?.Invoke(msg);
+        _contentIndexer.ProgressChanged += count => ProgressChanged?.Invoke(count);
         _contentSearcher = new ContentSearcher();
     }
 
@@ -50,7 +53,7 @@ public class SearchService : ISearchService, IDisposable
     /// <summary>设置内容索引的文件后缀</summary>
     public void SetContentExtensions(List<string> extensions)
     {
-        _contentExts = extensions;
+        _contentExts = extensions ?? [];
     }
 
     /// <summary>文件名索引文件总数</summary>
@@ -83,9 +86,9 @@ public class SearchService : ISearchService, IDisposable
             StatusMessage?.Invoke("正在建立内容索引（首次使用需要几秒到几分钟）...");
             try
             {
-                await _contentIndexer.BuildFullIndexAsync(
+                await Task.Run(async () => await _contentIndexer.BuildFullIndexAsync(
                     EnumerateFilesFromPaths(_indexPaths),
-                    CancellationToken.None);
+                    CancellationToken.None));
                 _contentSearcher.RefreshReadyState();
             }
             catch (Exception ex)
@@ -121,13 +124,13 @@ public class SearchService : ISearchService, IDisposable
             return;
         }
 
-        // 2. 重建内容索引（只扫描设置的索引路径）
+        // 2. 重建内容索引（后台线程，不阻塞 UI）
         StatusMessage?.Invoke("正在重建内容索引...");
         try
         {
-            await _contentIndexer.BuildFullIndexAsync(
+            await Task.Run(async () => await _contentIndexer.BuildFullIndexAsync(
                 EnumerateFilesFromPaths(_indexPaths),
-                CancellationToken.None);
+                CancellationToken.None));
             _contentSearcher.RefreshReadyState();
         }
         catch (Exception ex)
@@ -232,6 +235,7 @@ public class SearchService : ISearchService, IDisposable
     private IEnumerable<string> EnumerateFilesFromPaths(List<string> rootPaths)
     {
         var textExts = new HashSet<string>(_contentExts, StringComparer.OrdinalIgnoreCase);
+        Debug.WriteLine($"[ContentIndex] 路径数={rootPaths.Count}, 后缀数={_contentExts.Count}");
 
         var dirEnumOptions = new System.IO.EnumerationOptions
         {

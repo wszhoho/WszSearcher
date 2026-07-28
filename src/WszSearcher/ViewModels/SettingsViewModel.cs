@@ -41,7 +41,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _searchService.StatusMessage += OnStatusMessage;
         _searchService.ProgressChanged += OnProgressChanged;
 
-        // 初始加载索引统计
+        // 同步当前状态（可能在窗口打开前已变更）
+        OnSearchStatusChanged(_searchService.Status);
         UpdateIndexCounts();
     }
 
