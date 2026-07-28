@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using WszSearcher.Core.Preview;
 using WszSearcher.ViewModels;
 
 namespace WszSearcher.Views;
@@ -12,6 +13,8 @@ public partial class PreviewWindow : Window
     private bool _isSnapped = true;
     private bool _suppress;
     private const int SnapGap = 0;
+    private int _matchIndex = -1;
+    private int _matchCount;
 
     public PreviewWindow(MainViewModel viewModel)
     {
@@ -20,7 +23,6 @@ public partial class PreviewWindow : Window
         Visibility = Visibility.Collapsed;
         LocationChanged += OnLocationChanged;
 
-        // 监听搜索词和预览内容变化，自动高亮
         viewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(MainViewModel.SearchText) or nameof(MainViewModel.PreviewContent))
@@ -104,67 +106,106 @@ public partial class PreviewWindow : Window
         }
     }
 
-    private int _matchIndex = -1;
-    private int _matchCount;
-
-    /// <summary>根据搜索词高亮预览文本，并自动滚动到第一个匹配</summary>
     private void ApplyHighlight()
     {
-        // DataTrigger 可能在异步更新 Content，延迟重试确保 TextBlock 已渲染
         Dispatcher.BeginInvoke(new Action(ApplyHighlightCore), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void ApplyHighlightCore()
     {
         if (DataContext is not MainViewModel vm) return;
-        var text = vm.PreviewContent?.Content;
+        var content = vm.PreviewContent;
+        if (content is null) return;
+        var text = content.Content ?? "";
         var keyword = vm.SearchText?.Trim();
 
-        var tb = FindVisualChild<TextBlock>(PreviewContentControl);
-        if (tb is null) return;
-
-        tb.Inlines.Clear();
-        _matchIndex = -1;
-        _matchCount = 0;
-
-        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(keyword) || text.Length < keyword.Length)
+        // 图片类型不渲染文本
+        if (content.Type == PreviewType.Image)
         {
-            if (!string.IsNullOrEmpty(text))
-                tb.Inlines.Add(new Run(text));
-            UpdateMatchLabel();
+            PreviewContentHost.Child = new System.Windows.Controls.Image
+            {
+                Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(content.ImagePath ?? content.FilePath)),
+                MaxWidth = 360, MaxHeight = 500, Stretch = System.Windows.Media.Stretch.Uniform
+            };
             return;
         }
 
-        var runs = new List<Run>();
-        var idx = 0;
-        while (idx < text.Length)
+        // 构建 RichTextBox
+        var rtb = new System.Windows.Controls.RichTextBox
         {
-            var pos = text.IndexOf(keyword, idx, StringComparison.OrdinalIgnoreCase);
-            if (pos < 0)
-            {
-                runs.Add(new Run(text[idx..]));
+            IsReadOnly = true,
+            BorderThickness = new Thickness(0),
+            FontSize = 13,
+            FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei"),
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+        rtb.Resources.Add(typeof(Paragraph), new Style(typeof(Paragraph)) { Setters = { new Setter(Paragraph.MarginProperty, new Thickness(0)) } });
+
+        // 根据类型设置样式
+        switch (content.Type)
+        {
+            case PreviewType.Code:
+                rtb.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1E, 0x1E, 0x1E));
+                rtb.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD4, 0xD4, 0xD4));
+                rtb.FontFamily = new System.Windows.Media.FontFamily("Cascadia Code, Consolas, Courier New");
+                rtb.FontSize = 12;
                 break;
-            }
-
-            if (pos > idx)
-                runs.Add(new Run(text[idx..pos]));
-
-            var matchRun = new Run(text[pos..(pos + keyword.Length)])
-            {
-                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xE4, 0xB3)),
-                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x1A))
-            };
-            runs.Add(matchRun);
-            _matchCount++;
-            idx = pos + keyword.Length;
+            case PreviewType.RichText:
+                rtb.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xF8, 0xE1));
+                rtb.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x33, 0x33, 0x33));
+                rtb.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xE0, 0x82));
+                rtb.BorderThickness = new Thickness(1);
+                break;
+            default:
+                rtb.Background = System.Windows.Media.Brushes.Transparent;
+                break;
         }
 
-        foreach (var r in runs) tb.Inlines.Add(r);
-        UpdateMatchLabel();
+        PreviewContentHost.Child = rtb;
 
-        // 再延迟滚动到第一个匹配
+        // 高亮搜索词
+        var para = new Paragraph();
+        _matchIndex = -1;
+        _matchCount = 0;
+
+        if (string.IsNullOrEmpty(keyword) || text.Length < keyword.Length)
+        {
+            para.Inlines.Add(new Run(text));
+        }
+        else
+        {
+            var idx = 0;
+            while (idx < text.Length)
+            {
+                var pos = text.IndexOf(keyword, idx, StringComparison.OrdinalIgnoreCase);
+                if (pos < 0)
+                {
+                    para.Inlines.Add(new Run(text[idx..]));
+                    break;
+                }
+                if (pos > idx)
+                    para.Inlines.Add(new Run(text[idx..pos]));
+                para.Inlines.Add(new Run(text[pos..(pos + keyword.Length)])
+                {
+                    Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xE4, 0xB3)),
+                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x1A))
+                });
+                _matchCount++;
+                idx = pos + keyword.Length;
+            }
+        }
+
+        rtb.Document.Blocks.Add(para);
+        UpdateMatchLabel();
         Dispatcher.BeginInvoke(new Action(() => ScrollToMatch(-1)),
             System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void OnCopyContent(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && !string.IsNullOrEmpty(vm.PreviewContent?.Content))
+            System.Windows.Clipboard.SetText(vm.PreviewContent.Content);
     }
 
     private void OnPrevMatch(object sender, RoutedEventArgs e) => ScrollToMatch(-1);
@@ -172,43 +213,35 @@ public partial class PreviewWindow : Window
 
     private void ScrollToMatch(int direction)
     {
-        var tb = FindVisualChild<TextBlock>(PreviewContentControl);
-        if (tb is null || _matchCount == 0) return;
+        var rtb = PreviewContentHost.Child as System.Windows.Controls.RichTextBox;
+        if (rtb is null || _matchCount == 0) return;
 
         _matchIndex += direction;
         if (_matchIndex >= _matchCount) _matchIndex = 0;
         if (_matchIndex < 0) _matchIndex = _matchCount - 1;
 
-        // 找到第 N 个高亮 Run，滚动到它
         var match = 0;
-        foreach (var inline in tb.Inlines)
+        foreach (var block in rtb.Document.Blocks)
         {
-            if (inline is Run { Background: not null } && match++ == _matchIndex)
+            if (block is not Paragraph para) continue;
+            foreach (var inline in para.Inlines)
             {
-                inline.BringIntoView();
-                UpdateMatchLabel();
-                return;
+                if (inline is Run { Background: not null } && match++ == _matchIndex)
+                {
+                    // 获取 Run 的起始 TextPointer，滚动到该位置
+                    var start = inline.ContentStart;
+                    rtb.CaretPosition = start;
+                    var rect = start.GetCharacterRect(System.Windows.Documents.LogicalDirection.Forward);
+                    rtb.BringIntoView(rect);
+                    UpdateMatchLabel();
+                    return;
+                }
             }
         }
     }
 
     private void UpdateMatchLabel()
     {
-        if (_matchCount == 0)
-            MatchLabel.Text = "";
-        else
-            MatchLabel.Text = $"{_matchIndex + 1}/{_matchCount}";
-    }
-
-    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
-    {
-        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-        {
-            var child = VisualTreeHelper.GetChild(parent, i);
-            if (child is T t) return t;
-            var found = FindVisualChild<T>(child);
-            if (found is not null) return found;
-        }
-        return null;
+        MatchLabel.Text = _matchCount == 0 ? "" : $"{_matchIndex + 1}/{_matchCount}";
     }
 }
