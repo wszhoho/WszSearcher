@@ -122,11 +122,15 @@ public partial class PreviewWindow : Window
         // 图片类型不渲染文本
         if (content.Type == PreviewType.Image)
         {
-            PreviewContentHost.Child = new System.Windows.Controls.Image
+            var imgPath = content.ImagePath ?? content.FilePath;
+            if (!string.IsNullOrEmpty(imgPath))
             {
-                Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(content.ImagePath ?? content.FilePath)),
-                MaxWidth = 360, MaxHeight = 500, Stretch = System.Windows.Media.Stretch.Uniform
-            };
+                PreviewContentHost.Child = new System.Windows.Controls.Image
+                {
+                    Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(imgPath)),
+                    MaxWidth = 360, MaxHeight = 500, Stretch = System.Windows.Media.Stretch.Uniform
+                };
+            }
             return;
         }
 

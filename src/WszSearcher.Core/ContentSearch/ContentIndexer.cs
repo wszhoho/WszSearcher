@@ -159,6 +159,7 @@ public class ContentIndexer : IDisposable
             var writer = GetWriter();
             writer.DeleteDocuments(new Term("path", filePath));
             writer.Commit();
+            DocCount = writer.NumDocs();
         }
         catch (Exception ex)
         {
@@ -219,10 +220,30 @@ public class ContentIndexer : IDisposable
         catch { return 0; }
     }
 
-    /// <summary>从磁盘同步 DocCount（用于已有索引无需重建的场景）</summary>
+    /// <summary>从磁盘同步 DocCount</summary>
     public void SyncDocCount()
     {
         DocCount = TryGetDocCount();
+    }
+
+    /// <summary>提交增量变更（增量索引后调用）</summary>
+    public void CommitChanges()
+    {
+        try
+        {
+            lock (_writerLock)
+            {
+                if (_writer is not null && !_writerClosed)
+                {
+                    _writer.Commit();
+                    DocCount = _writer.NumDocs();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Commit 失败: {ex.Message}");
+        }
     }
 
     public void Dispose()

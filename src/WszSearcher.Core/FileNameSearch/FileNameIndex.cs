@@ -19,6 +19,19 @@ public class FileNameIndex : IDisposable
     /// <summary>索引文件总数</summary>
     public int Count => _count;
 
+    /// <summary>统计在指定路径范围内的文件数</summary>
+    public int CountInPaths(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0) return 0;
+        _lock.EnterReadLock();
+        try
+        {
+            return _allFiles.Count(f => paths.Any(p =>
+                f.FullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)));
+        }
+        finally { _lock.ExitReadLock(); }
+    }
+
     /// <summary>批量添加记录（首次建索引时使用）</summary>
     public void AddRange(IEnumerable<FileRecord> records)
     {

@@ -23,7 +23,8 @@ public class FileNameSearchProvider : IDisposable
     private FileSystemWatcher? _watcher;
     private int _initialized; // 使用 int + Interlocked 防止 TOCTOU
     private bool _disposed;
-    private volatile bool _rebuilding; // volatile 防止 FileSystemWatcher 回调读脏值
+    private volatile bool _rebuilding;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _recentFiles = new(); // 防抖
 
     /// <summary>索引状态变更事件</summary>
     public event Action<IndexState>? StateChanged;
@@ -33,6 +34,9 @@ public class FileNameSearchProvider : IDisposable
     public event Action<string>? StatusMessage;
 
     public IndexState State { get; private set; } = IndexState.NotInitialized;
+
+    /// <summary>获取内部索引（供过滤统计等用途）</summary>
+    public FileNameIndex GetIndex() => _index;
 
     /// <summary>当前索引文件总数</summary>
     public int IndexCount => _index.Count;
@@ -173,7 +177,8 @@ public class FileNameSearchProvider : IDisposable
 
     private void OnFileCreated(object sender, FileSystemEventArgs e)
     {
-        if (_rebuilding) return; // 重建中忽略事件
+        if (_rebuilding || ShouldIgnore(e.FullPath)) return;
+        if (!Debounce(e.FullPath)) return;
         try
         {
             var fi = new FileInfo(e.FullPath);
@@ -187,20 +192,23 @@ public class FileNameSearchProvider : IDisposable
                     FileSize = fi.Length,
                     LastModified = fi.LastWriteTime
                 });
+                AppLog.Info("fname", $"+ {fi.Name}");
             }
         }
-        catch { /* 忽略 */ }
+        catch { }
     }
 
     private void OnFileDeleted(object sender, FileSystemEventArgs e)
     {
-        if (_rebuilding) return;
+        if (_rebuilding || ShouldIgnore(e.FullPath)) return;
         _index.Remove(e.FullPath);
+        AppLog.Info("fname", $"- {System.IO.Path.GetFileName(e.FullPath)}");
     }
 
     private void OnFileRenamed(object sender, RenamedEventArgs e)
     {
-        if (_rebuilding) return;
+        if (_rebuilding || ShouldIgnore(e.FullPath)) return;
+        if (!Debounce(e.FullPath)) return;
         _index.Remove(e.OldFullPath);
         try
         {
@@ -217,13 +225,14 @@ public class FileNameSearchProvider : IDisposable
                 });
             }
         }
-        catch { /* 忽略 */ }
+        catch { }
+        AppLog.Info("fname", $"改名: {System.IO.Path.GetFileName(e.OldFullPath)} -> {System.IO.Path.GetFileName(e.FullPath)}");
     }
 
     private void OnFileChanged(object sender, FileSystemEventArgs e)
     {
-        if (_rebuilding) return;
-        // 只处理非目录文件的大小/时间变更
+        if (_rebuilding || ShouldIgnore(e.FullPath)) return;
+        if (!Debounce(e.FullPath)) return;
         try
         {
             var fi = new FileInfo(e.FullPath);
@@ -239,7 +248,32 @@ public class FileNameSearchProvider : IDisposable
                 });
             }
         }
-        catch { /* 忽略 */ }
+        catch { }
+    }
+
+    /// <summary>防抖：同一文件 2 秒内不重复处理</summary>
+    private bool Debounce(string path)
+    {
+        var now = DateTime.UtcNow;
+        if (_recentFiles.TryGetValue(path, out var last) && (now - last).TotalSeconds < 2)
+            return false;
+        _recentFiles[path] = now;
+        return true;
+    }
+
+    /// <summary>是否应被文件名索引忽略</summary>
+    private static bool ShouldIgnore(string path)
+    {
+        var name = System.IO.Path.GetFileName(path);
+        if (name.Length == 0) return true;
+        // Office 临时文件
+        if (name[0] == '~' || (name[0] == '$' && name.EndsWith(".docx", StringComparison.OrdinalIgnoreCase)))
+            return true;
+        // Lucene 索引目录
+        if (path.Contains("\\Index\\", StringComparison.OrdinalIgnoreCase) &&
+            (name.StartsWith('_') || name.StartsWith("segments") || name == "write.lock"))
+            return true;
+        return false;
     }
 
     private void OnWatcherError(object sender, ErrorEventArgs e)

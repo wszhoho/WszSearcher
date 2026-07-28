@@ -113,17 +113,17 @@ public class GlobalHotkeyService : IDisposable
         return DoRegister();
     }
 
-    /// <summary>检测快捷键是否冲突（不实际注册）</summary>
+    /// <summary>检测快捷键是否冲突（使用独立 ID 避免与自身冲突）</summary>
     public static bool CheckConflict(IntPtr hwnd, uint modifiers, uint key, int id = 1)
     {
-        if (hwnd == IntPtr.Zero) return true; // 无效句柄
+        if (hwnd == IntPtr.Zero) return true;
 
-        // 尝试注册 → 如果失败则是冲突
-        if (!RegisterHotKey(hwnd, id, modifiers | MOD_NOREPEAT, key))
+        // 使用独立 ID 检测，避免与自身注册的快捷键冲突
+        const int testId = 0x7FFF;
+        if (!RegisterHotKey(hwnd, testId, modifiers | MOD_NOREPEAT, key))
             return true;
 
-        // 注册成功 → 立即注销 → 不冲突
-        UnregisterHotKey(hwnd, id);
+        UnregisterHotKey(hwnd, testId);
         return false;
     }
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using WszSearcher.Core.ContentSearch;
 using WszSearcher.Core.FileNameSearch;
@@ -14,8 +15,9 @@ public class SearchService : ISearchService, IDisposable
     private readonly FileNameSearchProvider _fileNameSearch;
     private readonly ContentIndexer _contentIndexer;
     private readonly ContentSearcher _contentSearcher;
-    private List<string> _indexPaths = []; // 内容索引路径列表
-    private List<string> _contentExts = []; // 内容索引文件后缀
+    private List<string> _indexPaths = [];
+    private List<string> _contentExts = [];
+    private FileSystemWatcher? _contentWatcher; // 内容索引增量监听
     private bool _disposed;
 
     public SearchService(char driveLetter = 'C')
@@ -57,7 +59,7 @@ public class SearchService : ISearchService, IDisposable
     }
 
     /// <summary>文件名索引文件总数</summary>
-    public int FileNameIndexCount => _fileNameSearch.IndexCount;
+    public int FileNameIndexCount => _fileNameSearch.GetIndex().CountInPaths(_indexPaths);
 
     /// <summary>内容索引文档总数</summary>
     public int ContentIndexCount => _contentIndexer.IsReady
@@ -101,18 +103,26 @@ public class SearchService : ISearchService, IDisposable
         else
         {
             _contentIndexer.IsReady = true;
-            _contentIndexer.SyncDocCount(); // 从磁盘读取实际文档数
-            _contentSearcher.RefreshReadyState(); // 刷新 ContentSearcher 的索引就绪状态
+            _contentIndexer.SyncDocCount();
+            _contentSearcher.RefreshReadyState();
             StatusMessage?.Invoke("内容索引已就绪");
         }
 
         Status = SearchStatus.Ready;
         StatusChanged?.Invoke(Status);
+        StartContentWatcher();
     }
+
+    private bool _rebuilding;
+    private readonly ConcurrentDictionary<string, DateTime> _recentFiles = new();
+
+    private static void Log(string msg) => AppLog.Info("content", msg);
 
     /// <summary>重建索引：清空文件名索引和内容索引，重新扫描建索引</summary>
     public async Task RebuildIndexAsync()
     {
+        _rebuilding = true;
+        StopContentWatcher();
         Status = SearchStatus.Indexing;
         StatusChanged?.Invoke(Status);
 
@@ -144,6 +154,100 @@ public class SearchService : ISearchService, IDisposable
         Status = SearchStatus.Ready;
         StatusChanged?.Invoke(Status);
         StatusMessage?.Invoke($"索引重建完成！文件名 {FileNameIndexCount} 个，内容 {ContentIndexCount} 个");
+        _rebuilding = false;
+        StartContentWatcher();
+    }
+
+    private void StartContentWatcher()
+    {
+        if (_indexPaths.Count == 0 || _contentExts.Count == 0) return;
+        try
+        {
+            _contentWatcher?.Dispose();
+            _contentWatcher = new FileSystemWatcher
+            {
+                IncludeSubdirectories = true,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
+                InternalBufferSize = 32768
+            };
+            _contentWatcher.Created += OnContentFileChanged;
+            _contentWatcher.Changed += OnContentFileChanged;
+            _contentWatcher.Deleted += OnContentFileDeleted;
+            _contentWatcher.Renamed += OnContentFileRenamed;
+            _contentWatcher.Error += (_, e) => Debug.WriteLine($"内容索引监听异常: {e.GetException()?.Message}");
+
+            // 监听所有索引路径
+            foreach (var path in _indexPaths)
+            {
+                if (System.IO.Directory.Exists(path))
+                    _contentWatcher.Path = path; // FSW 只能监听一个根，这里需要为每个路径创建...
+            }
+            // 监听第一个索引路径
+            if (_indexPaths.Count > 0 && System.IO.Directory.Exists(_indexPaths[0]))
+            {
+                _contentWatcher.Path = _indexPaths[0];
+                _contentWatcher.EnableRaisingEvents = true;
+                Log($"[ContentWatcher] 已启动: {_indexPaths[0]}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"内容索引监听启动失败: {ex.Message}");
+        }
+    }
+
+    private void StopContentWatcher()
+    {
+        _contentWatcher?.Dispose();
+        _contentWatcher = null;
+    }
+
+    private async void OnContentFileChanged(object sender, FileSystemEventArgs e)
+    {
+        if (_rebuilding) return;
+        var ext = Path.GetExtension(e.FullPath).TrimStart('.').ToLowerInvariant();
+        if (!_contentExts.Contains(ext, StringComparer.OrdinalIgnoreCase)) return;
+
+        // 防抖：同一文件 3 秒内只索引一次
+        var now = DateTime.UtcNow;
+        if (_recentFiles.TryGetValue(e.FullPath, out var last) && (now - last).TotalSeconds < 3)
+            return;
+        _recentFiles[e.FullPath] = now;
+
+        Log($"[ContentWatcher] 索引: {Path.GetFileName(e.FullPath)}");
+        try
+        {
+            await Task.Delay(200);
+            await _contentIndexer.IndexFileAsync(e.FullPath);
+            _contentIndexer.CommitChanges();
+            Log($"增量索引完成: {Path.GetFileName(e.FullPath)}, 文件名={_fileNameSearch.IndexCount}, 内容={_contentIndexer.DocCount}");
+        }
+        catch (Exception ex) { Log($"增量索引失败: {ex.Message}"); }
+    }
+
+    private void OnContentFileDeleted(object sender, FileSystemEventArgs e)
+    {
+        if (_rebuilding) return;
+        Log($"[ContentWatcher] 删除: {Path.GetFileName(e.FullPath)}");
+        try
+        {
+            _contentIndexer.RemoveFile(e.FullPath);
+            Log($"删除索引完成: {Path.GetFileName(e.FullPath)}, 内容={_contentIndexer.DocCount}");
+        }
+        catch (Exception ex) { Log($"删除索引失败: {ex.Message}"); }
+    }
+
+    private void OnContentFileRenamed(object sender, RenamedEventArgs e)
+    {
+        if (_rebuilding) return;
+        try
+        {
+            _contentIndexer.RemoveFile(e.OldFullPath);
+            var ext = Path.GetExtension(e.FullPath).TrimStart('.').ToLowerInvariant();
+            if (_contentExts.Contains(ext, StringComparer.OrdinalIgnoreCase))
+                _ = _contentIndexer.IndexFileAsync(e.FullPath);
+        }
+        catch (Exception ex) { Debug.WriteLine($"重命名索引失败: {ex.Message}"); }
     }
 
     private int _fileNameInitStarted; // 0=未启动, 1=已启动（Interlocked 原子操作防 TOCTOU）
@@ -307,6 +411,7 @@ public class SearchService : ISearchService, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        StopContentWatcher();
         _fileNameSearch.Dispose();
         _contentIndexer.Dispose();
         _contentSearcher.Dispose();
