@@ -67,7 +67,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void RemoveIndexPath(ObservablePath? path)
     {
-        if (path is not null && IndexPaths.Count > 1)
+        if (path is not null)
             IndexPaths.Remove(path);
     }
 

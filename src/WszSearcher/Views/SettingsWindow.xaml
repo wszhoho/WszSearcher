@@ -141,7 +141,7 @@
                 <TextBlock Text="WszSearcher 设置"
                            FontSize="22" FontWeight="Bold"
                            Foreground="{DynamicResource TextPrimaryBrush}" />
-                <TextBlock Text="配置搜索范围、外观和索引选项"
+                <TextBlock Text="配置搜索范围、快捷键和索引选项"
                            FontSize="12"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            Margin="0,4,0,0" />

@@ -17,7 +17,8 @@ public class SearchService : ISearchService, IDisposable
     private readonly ContentSearcher _contentSearcher;
     private List<string> _indexPaths = [];
     private List<string> _contentExts = [];
-    private FileSystemWatcher? _contentWatcher; // 内容索引增量监听
+    private FileSystemWatcher? _contentWatcher;
+    private CancellationTokenSource? _buildCts; // 索引构建取消令牌
     private bool _disposed;
 
     public SearchService(char driveLetter = 'C')
@@ -51,6 +52,14 @@ public class SearchService : ISearchService, IDisposable
             _fileNameSearch.SetDrive(drive);
             _fileNameSearch.SetFallbackPaths(paths);
         }
+        CancelBuild(); // 增删目录时取消正在进行的索引
+    }
+
+    private void CancelBuild()
+    {
+        _buildCts?.Cancel();
+        _buildCts?.Dispose();
+        _buildCts = null;
     }
 
     /// <summary>设置内容索引的文件后缀（同时用于文件名过滤）</summary>
@@ -76,7 +85,8 @@ public class SearchService : ISearchService, IDisposable
         Status = SearchStatus.Indexing;
         StatusChanged?.Invoke(Status);
 
-        // 1. 文件名索引（USN 扫描）
+        // 1. 文件名索引
+        StatusMessage?.Invoke("正在建立文件名索引...");
         await _fileNameSearch.InitializeAsync();
 
         if (_fileNameSearch.State != IndexState.Ready)
@@ -86,15 +96,16 @@ public class SearchService : ISearchService, IDisposable
             return;
         }
 
-        // 2. 内容索引：如果索引不存在或为空，则重建
+        // 2. 内容索引
         if (!_contentIndexer.IndexExists() || _contentIndexer.TryGetDocCount() == 0)
         {
-            StatusMessage?.Invoke("正在建立内容索引（首次使用需要几秒到几分钟）...");
+            StatusMessage?.Invoke("正在建立内容索引...");
             try
             {
+                CancelBuild();
+                _buildCts = new CancellationTokenSource();
                 await Task.Run(async () => await _contentIndexer.BuildFullIndexAsync(
-                    EnumerateFilesFromPaths(_indexPaths),
-                    CancellationToken.None));
+                    EnumerateFilesFromPaths(_indexPaths), _buildCts.Token), _buildCts.Token);
                 _contentSearcher.RefreshReadyState();
             }
             catch (Exception ex)
@@ -125,11 +136,15 @@ public class SearchService : ISearchService, IDisposable
     {
         _rebuilding = true;
         StopContentWatcher();
+        CancelBuild();
+        _buildCts = new CancellationTokenSource();
+        var ct = _buildCts.Token;
+
         Status = SearchStatus.Indexing;
         StatusChanged?.Invoke(Status);
 
-        // 1. 清空并重建文件名索引
-        StatusMessage?.Invoke("正在重新扫描文件系统（USN Journal）...");
+        // 1. 文件名索引
+        StatusMessage?.Invoke("正在建立文件名索引...");
         await _fileNameSearch.RebuildAsync();
 
         if (_fileNameSearch.State != IndexState.Ready)
@@ -139,13 +154,12 @@ public class SearchService : ISearchService, IDisposable
             return;
         }
 
-        // 2. 重建内容索引（后台线程，不阻塞 UI）
-        StatusMessage?.Invoke("正在重建内容索引...");
+        // 2. 内容索引
+        StatusMessage?.Invoke("正在建立内容索引...");
         try
         {
             await Task.Run(async () => await _contentIndexer.BuildFullIndexAsync(
-                EnumerateFilesFromPaths(_indexPaths),
-                CancellationToken.None));
+                EnumerateFilesFromPaths(_indexPaths), ct), ct);
             _contentSearcher.RefreshReadyState();
         }
         catch (Exception ex)
