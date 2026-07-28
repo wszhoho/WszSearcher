@@ -80,9 +80,7 @@ public class FileNameSearchProvider : IDisposable
         AppLog.Info("fname", $"USN 扫描完成: {files.Count} 个文件 (盘符={_driveLetter})");
 
             var filtered = _extFilter.Count == 0 ? files : files.Where(f => PassExtFilter(f.FullPath)).ToList();
-            AppLog.Info("fname", $"AddRange: 扫描={files.Count}, 后缀过滤后={filtered.Count}, extFilter=[{string.Join(",", _extFilter)}]");
             _index.AddRange(filtered);
-            AppLog.Info("fname", $"AddRange完成: _allFiles={_index.Count}");
 
             // 启动文件变更监听
             StartWatcher();

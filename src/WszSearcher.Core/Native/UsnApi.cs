@@ -120,11 +120,10 @@ internal static class UsnApi
                         IntPtr.Zero))
                 {
                     var err = Marshal.GetLastWin32Error();
-                    AppLog.Warn("fname", $"[USN] Enumerate DeviceIoControl 失败, error={err}");
+                    if (err != 38) // ERROR_HANDLE_EOF 是正常结束，不警告
+                        AppLog.Warn("fname", $"[USN] Enumerate 失败, error={err}");
                     break;
                 }
-
-                AppLog.Info("fname", $"[USN] Enumerate 成功, bytes={bytesReturned}");
 
                 // 至少需要一个完整记录头
                 if (bytesReturned < minUsnHeaderSize)

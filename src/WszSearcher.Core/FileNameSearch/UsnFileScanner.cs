@@ -217,8 +217,7 @@ public class UsnFileScanner
                     }
                     catch { }
                 }
-                if (subDirCount > 0 || fileCount > 0)
-                    AppLog.Info("fname", $"  目录 {dir}: {subDirCount} 子目录, {fileCount} 文件");
+                if (subDirCount > 0 || fileCount > 0) { } // 只计不输出
             }
             catch (Exception ex) { AppLog.Warn("fname", $"  遍历失败 {dir}: {ex.Message}"); }
         }

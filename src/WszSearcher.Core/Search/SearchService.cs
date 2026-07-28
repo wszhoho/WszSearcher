@@ -62,15 +62,7 @@ public class SearchService : ISearchService, IDisposable
     }
 
     /// <summary>文件名索引文件总数</summary>
-    public int FileNameIndexCount
-    {
-        get
-        {
-            var count = _fileNameSearch.GetIndex().CountInPaths(_indexPaths);
-            AppLog.Info("content", $"FileNameCount: 全盘={_fileNameSearch.IndexCount}, 过滤={count}, 路径={string.Join(",", _indexPaths)}");
-            return count;
-        }
-    }
+    public int FileNameIndexCount => _fileNameSearch.GetIndex().CountInPaths(_indexPaths);
 
     /// <summary>内容索引文档总数</summary>
     public int ContentIndexCount => _contentIndexer.IsReady

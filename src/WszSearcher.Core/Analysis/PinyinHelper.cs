@@ -13,19 +13,14 @@ public static class PinyinHelper
         if (string.IsNullOrEmpty(text) || _initFailed) return "";
         try
         {
-            var result = WordsHelper.GetFirstPinyin(text) ?? "";
-            if (!_logged) { AppLog.Info("pinyin", $"GetFirstLetters 成功: '{text}' -> '{result}'"); _logged = true; }
-            return result;
+            return WordsHelper.GetFirstPinyin(text) ?? "";
         }
-        catch (Exception ex)
+        catch
         {
             _initFailed = true;
-            AppLog.Warn("pinyin", $"GetFirstLetters 失败: {ex.GetType().Name} {ex.Message}");
             return "";
         }
     }
-
-    private static bool _logged;
 
     public static string GetPinyin(string text)
     {

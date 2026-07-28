@@ -26,9 +26,7 @@ public class FileNameIndex : IDisposable
         _lock.EnterReadLock();
         try
         {
-            var sample = _allFiles.Take(3).Select(f => f.FullPath).ToList();
             var ps = paths.Select(p => p.EndsWith('\\') ? p : p + "\\").ToList();
-            AppLog.Info("fname", $"CountInPaths: paths=[{string.Join(",", ps)}], sample=[{string.Join(",", sample)}]");
             return _allFiles.Count(f => ps.Any(p =>
                 f.FullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)));
         }
