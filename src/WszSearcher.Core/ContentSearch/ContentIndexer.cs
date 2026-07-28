@@ -87,6 +87,7 @@ public class ContentIndexer : IDisposable
     /// <summary>全量重建索引（定期 commit 防止内存膨胀）</summary>
     public async Task BuildFullIndexAsync(IEnumerable<string> filePaths, CancellationToken ct = default)
     {
+        AppLog.Info("content", $"BuildFullIndex 开始");
         IsReady = false;
         var writer = GetWriter();
 
@@ -135,6 +136,7 @@ public class ContentIndexer : IDisposable
 
         var finalHandler = StatusChanged;
         finalHandler?.Invoke($"内容索引完成！共 {DocCount} 个文档，耗时 {sw.Elapsed.TotalSeconds:F1} 秒");
+        AppLog.Info("content", $"BuildFullIndex 完成, DocCount={DocCount}");
     }
 
     /// <summary>增量索引单个文件</summary>

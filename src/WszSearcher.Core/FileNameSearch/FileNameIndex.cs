@@ -122,13 +122,14 @@ public class FileNameIndex : IDisposable
 
         // 在快照上搜索，不持有锁
         var q = query.Trim();
+        var phaseMax = maxResults / 3; // 前 3 阶段只占 1/3，给拼音留 2/3
         var results = new List<FileRecord>(maxResults);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Phase 1: 前缀匹配（最相关）
+        // Phase 1: 前缀匹配
         foreach (var record in snapshot)
         {
-            if (results.Count >= maxResults) break;
+            if (results.Count >= phaseMax) break;
             if (record.FileName.StartsWith(q, StringComparison.OrdinalIgnoreCase))
             {
                 if (seen.Add(record.FullPath))
@@ -136,12 +137,12 @@ public class FileNameIndex : IDisposable
             }
         }
 
-        // Phase 2: 包含匹配（如果结果不够）
-        if (results.Count < maxResults)
+        // Phase 2: 包含匹配
+        if (results.Count < phaseMax)
         {
             foreach (var record in snapshot)
             {
-                if (results.Count >= maxResults) break;
+                if (results.Count >= phaseMax) break;
                 if (seen.Contains(record.FullPath)) continue;
                 if (record.FileName.Contains(q, StringComparison.OrdinalIgnoreCase))
                 {
@@ -152,11 +153,11 @@ public class FileNameIndex : IDisposable
         }
 
         // Phase 3: 路径包含匹配
-        if (results.Count < maxResults)
+        if (results.Count < phaseMax)
         {
             foreach (var record in snapshot)
             {
-                if (results.Count >= maxResults) break;
+                if (results.Count >= phaseMax) break;
                 if (seen.Contains(record.FullPath)) continue;
                 if (record.FullPath.Contains(q, StringComparison.OrdinalIgnoreCase))
                 {

@@ -7,7 +7,6 @@ public static class PinyinHelper
 {
     private static bool _initFailed;
 
-    /// <summary>获取文本的拼音首字母（中文→首字母，英文/数字原样保留）</summary>
     public static string GetFirstLetters(string text)
     {
         if (string.IsNullOrEmpty(text) || _initFailed) return "";
@@ -15,21 +14,13 @@ public static class PinyinHelper
         {
             return WordsHelper.GetFirstPinyin(text) ?? "";
         }
-        catch
-        {
-            _initFailed = true;
-            return "";
-        }
+        catch { _initFailed = true; return ""; }
     }
 
     public static string GetPinyin(string text)
     {
         if (string.IsNullOrEmpty(text) || _initFailed) return "";
-        try
-        {
-            var result = WordsHelper.GetPinyin(text) ?? "";
-            return result;
-        }
+        try { return WordsHelper.GetPinyin(text) ?? ""; }
         catch { return ""; }
     }
 }
