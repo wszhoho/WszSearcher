@@ -207,6 +207,24 @@ public class ContentIndexer : IDisposable
         }
     }
 
+    /// <summary>尝试从磁盘读取索引文档数（不依赖内存 IsReady 状态）</summary>
+    public int TryGetDocCount()
+    {
+        try
+        {
+            if (!IndexReader.IndexExists(_directory)) return 0;
+            using var reader = IndexReader.Open(_directory, true);
+            return reader.NumDocs();
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>从磁盘同步 DocCount（用于已有索引无需重建的场景）</summary>
+    public void SyncDocCount()
+    {
+        DocCount = TryGetDocCount();
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

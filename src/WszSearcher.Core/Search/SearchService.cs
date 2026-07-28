@@ -60,7 +60,9 @@ public class SearchService : ISearchService, IDisposable
     public int FileNameIndexCount => _fileNameSearch.IndexCount;
 
     /// <summary>内容索引文档总数</summary>
-    public int ContentIndexCount => _contentIndexer.IsReady ? _contentIndexer.DocCount : 0;
+    public int ContentIndexCount => _contentIndexer.IsReady
+        ? _contentIndexer.DocCount
+        : _contentIndexer.TryGetDocCount();
 
     /// <summary>
     /// 初始化：先建文件名索引（USN Journal），再触发内容索引
@@ -99,6 +101,7 @@ public class SearchService : ISearchService, IDisposable
         else
         {
             _contentIndexer.IsReady = true;
+            _contentIndexer.SyncDocCount(); // 从磁盘读取实际文档数
             _contentSearcher.RefreshReadyState(); // 刷新 ContentSearcher 的索引就绪状态
             StatusMessage?.Invoke("内容索引已就绪");
         }
