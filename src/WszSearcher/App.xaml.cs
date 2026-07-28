@@ -37,6 +37,7 @@ namespace WszSearcher;
 
         _mainWindow = new MainWindow(_mainViewModel, _settings);
         _mainWindow.Show();
+        _mainWindow.Hide(); // 开机启动时隐藏到托盘
 
         // 创建浮动预览窗口（附属于主窗口，初始隐藏）
         _previewWindow = new PreviewWindow(_mainViewModel);

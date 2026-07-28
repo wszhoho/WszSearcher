@@ -124,6 +124,8 @@ public partial class MainViewModel : ObservableObject
                         Results.Clear();
                         ResultCount = 0;
                         HasSearched = false;
+                        IsExpanded = false; // 折叠回搜索框
+                        IsPreviewVisible = false;
                     });
                 }
                 return;

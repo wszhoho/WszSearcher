@@ -89,8 +89,16 @@ public partial class MainWindow : Window
                 _isExpanded = true;
                 ResultRow.Height = new GridLength(1, GridUnitType.Star);
                 SearchBarBorder.CornerRadius = new CornerRadius(8, 8, 0, 0);
-                SearchBarBorder.BorderThickness = new Thickness(0, 0, 0, 1); // 底部边框分割线
+                SearchBarBorder.BorderThickness = new Thickness(0, 0, 0, 1);
                 AdjustExpandedHeight();
+            }
+            else if (!_viewModel.IsExpanded && _isExpanded)
+            {
+                _isExpanded = false;
+                ResultRow.Height = new GridLength(0);
+                SearchBarBorder.CornerRadius = new CornerRadius(8);
+                SearchBarBorder.BorderThickness = new Thickness(0);
+                Height = CollapsedHeight;
             }
         }
         else if (e.PropertyName == nameof(MainViewModel.ResultCount))

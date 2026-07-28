@@ -29,7 +29,7 @@
         <Setter Property="Height" Value="48" />
         <Setter Property="Padding" Value="16,0" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Background" Value="#01FFFFFF" /> <!-- 分层窗口光标 workaround -->
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
         <Setter Property="CaretBrush" Value="{DynamicResource PrimaryBrush}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource PrimaryBrush}" />
