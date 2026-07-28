@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WszSearcher.Core/WszSearcher.Core.csproj" />
+    <Project Path="src/WszSearcher/WszSearcher.csproj" />
+  </Folder>
+</Solution>

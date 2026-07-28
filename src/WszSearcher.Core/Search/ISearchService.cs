@@ -1,0 +1,48 @@
+using WszSearcher.Core.Models;
+
+namespace WszSearcher.Core.Search;
+
+/// <summary>搜索服务接口——统一文件名搜索与内容搜索</summary>
+public interface ISearchService
+{
+    /// <summary>搜索结果变更事件</summary>
+    event Action<IReadOnlyList<SearchResult>>? ResultsUpdated;
+
+    /// <summary>搜索状态变更事件</summary>
+    event Action<SearchStatus>? StatusChanged;
+
+    /// <summary>索引状态消息</summary>
+    event Action<string>? StatusMessage;
+
+    /// <summary>索引进度（已处理文件数）</summary>
+    event Action<int>? ProgressChanged;
+
+    /// <summary>异步搜索</summary>
+    Task SearchAsync(string query, CancellationToken ct = default);
+
+    /// <summary>初始化（首次全量建索引）</summary>
+    Task InitializeAsync();
+
+    /// <summary>重建索引（清空后重新扫描+索引）</summary>
+    Task RebuildIndexAsync();
+
+    /// <summary>设置内容索引扫描路径（设置变更后调用）</summary>
+    void SetIndexPaths(List<string> paths);
+
+    /// <summary>当前搜索状态</summary>
+    SearchStatus Status { get; }
+
+    /// <summary>文件名索引中的文件总数</summary>
+    int FileNameIndexCount { get; }
+
+    /// <summary>内容索引中的文档总数</summary>
+    int ContentIndexCount { get; }
+}
+
+public enum SearchStatus
+{
+    Idle,
+    Indexing,
+    Searching,
+    Ready
+}
