@@ -90,10 +90,21 @@ src/
 4. `MultiFieldQueryParser` 同时搜索 filename + content 字段
 5. 结果与文件名搜索结果合并去重，按索引路径过滤
 
+## 运行环境
+
+- **操作系统**：Windows 10 1809+ / Windows 11 / Windows Server 2019+
+- **运行时**：[.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)（桌面运行时）
+- **文件系统**：NTFS（USN Journal 特性依赖）
+- **权限**：管理员权限下可获得 Everything 级扫描速度；普通权限自动降级为目录遍历
+
 ## 构建
 
 ```bash
+# Debug
 dotnet build
+
+# Release 单文件发布
+dotnet publish -c Release
 ```
 
 ## 许可

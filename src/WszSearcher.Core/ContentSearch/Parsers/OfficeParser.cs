@@ -32,6 +32,11 @@ public class OfficeParser : IDocumentParser
             // 加密/损坏的 Office 文档，静默跳过
             return Task.FromResult<string?>(null);
         }
+        catch (System.IO.FileFormatException)
+        {
+            // 文件内容损坏，静默跳过
+            return Task.FromResult<string?>(null);
+        }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Office 解析失败 [{filePath}]: {ex.Message}");

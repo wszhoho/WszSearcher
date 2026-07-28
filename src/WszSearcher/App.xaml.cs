@@ -56,9 +56,14 @@ namespace WszSearcher;
         // 强制创建托盘图标（WPF 中带 Key 的资源是惰性实例化，必须主动访问才能创建）
         _ = FindResource("TrayIcon");
 
-        // 设置索引路径并自动初始化（已有索引则秒过，无索引则首次建立）
-        searchService.SetIndexPaths(_settings.IndexPaths);
-        _ = searchService.InitializeAsync();
+        searchService.SetContentExtensions(_settings.ContentIndexExtensions);
+
+        // 有索引路径时才自动初始化
+        if (_settings.IndexPaths.Count > 0)
+        {
+            searchService.SetIndexPaths(_settings.IndexPaths);
+            _ = searchService.InitializeAsync();
+        }
     }
 
     private void ApplySavedTheme()

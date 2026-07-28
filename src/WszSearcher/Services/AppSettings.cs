@@ -23,10 +23,19 @@ public class AppSettings
     public int Theme { get; set; } = 2;
 
     /// <summary>索引路径列表</summary>
-    public List<string> IndexPaths { get; set; } = ["C:\\"];
+    public List<string> IndexPaths { get; set; } = [];
 
     /// <summary>排除路径模式列表</summary>
     public List<string> ExcludePaths { get; set; } = ["*\\node_modules", "*\\.git", "*\\AppData", "*\\$RECYCLE.BIN"];
+
+    /// <summary>全文索引的文件后缀（不含点）</summary>
+    public List<string> ContentIndexExtensions { get; set; } =
+    [
+        "txt", "md", "csv", "log", "json", "xml", "yaml", "yml",
+        "cs", "js", "ts", "html", "css", "py", "cpp", "c", "h",
+        "pdf", "docx", "xlsx", "pptx",
+        "ini", "cfg", "config", "java", "rs", "go", "php"
+    ];
 
     /// <summary>开机自启</summary>
     public bool AutoStart { get; set; }

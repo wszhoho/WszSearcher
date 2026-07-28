@@ -13,7 +13,8 @@ public class SearchService : ISearchService, IDisposable
     private readonly FileNameSearchProvider _fileNameSearch;
     private readonly ContentIndexer _contentIndexer;
     private readonly ContentSearcher _contentSearcher;
-    private List<string> _indexPaths = ["C:\\"]; // 内容索引路径列表
+    private List<string> _indexPaths = []; // 内容索引路径列表
+    private List<string> _contentExts = []; // 内容索引文件后缀
     private bool _disposed;
 
     public SearchService(char driveLetter = 'C')
@@ -44,6 +45,12 @@ public class SearchService : ISearchService, IDisposable
             var drive = paths[0].Length > 0 ? paths[0][0] : 'C';
             _fileNameSearch.SetDrive(drive);
         }
+    }
+
+    /// <summary>设置内容索引的文件后缀</summary>
+    public void SetContentExtensions(List<string> extensions)
+    {
+        _contentExts = extensions;
     }
 
     /// <summary>文件名索引文件总数</summary>
@@ -183,6 +190,13 @@ public class SearchService : ISearchService, IDisposable
                         r.FullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
                     .ToList();
 
+                // 按配置的后缀过滤内容搜索结果
+                var validExts = new HashSet<string>(_contentExts, StringComparer.OrdinalIgnoreCase);
+                contentResults = contentResults
+                    .Where(r => validExts.Contains(
+                        Path.GetExtension(r.FullPath).TrimStart('.')))
+                    .ToList();
+
                 // HashSet 去重
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var merged = new List<SearchResult>();
@@ -215,15 +229,9 @@ public class SearchService : ISearchService, IDisposable
     }
 
     /// <summary>从指定路径列表遍历文件（内容索引输入源），跳过重解析点和系统目录</summary>
-    private static IEnumerable<string> EnumerateFilesFromPaths(List<string> rootPaths)
+    private IEnumerable<string> EnumerateFilesFromPaths(List<string> rootPaths)
     {
-        var textExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ".txt", ".md", ".csv", ".log", ".json", ".xml", ".yaml", ".yml",
-            ".cs", ".js", ".ts", ".html", ".css", ".py", ".cpp", ".c", ".h",
-            ".pdf", ".docx", ".xlsx", ".pptx",
-            ".ini", ".cfg", ".config", ".java", ".rs", ".go", ".php"
-        };
+        var textExts = new HashSet<string>(_contentExts, StringComparer.OrdinalIgnoreCase);
 
         var dirEnumOptions = new System.IO.EnumerationOptions
         {
@@ -273,7 +281,7 @@ public class SearchService : ISearchService, IDisposable
             foreach (var file in files)
             {
                 if (fileCount >= maxFiles) yield break;
-                var ext = System.IO.Path.GetExtension(file).ToLowerInvariant();
+                var ext = System.IO.Path.GetExtension(file).TrimStart('.').ToLowerInvariant();
                 if (textExts.Contains(ext))
                 {
                     fileCount++;

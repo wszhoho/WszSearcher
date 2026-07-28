@@ -36,9 +36,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         foreach (var path in settings.IndexPaths)
             IndexPaths.Add(new ObservablePath { Path = path });
 
-        foreach (var pattern in settings.ExcludePaths)
-            ExcludePatterns.Add(new ObservablePath { Path = pattern });
-
         // 订阅索引状态事件
         _searchService.StatusChanged += OnSearchStatusChanged;
         _searchService.StatusMessage += OnStatusMessage;
@@ -90,19 +87,20 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
     // ─── 排除模式 ───
 
-    public ObservableCollection<ObservablePath> ExcludePatterns { get; } = [];
-
-    [RelayCommand]
-    private void AddExcludePattern()
+    public string ExcludePatternsText
     {
-        ExcludePatterns.Add(new ObservablePath { Path = "*\\" });
-    }
-
-    [RelayCommand]
-    private void RemoveExcludePattern(ObservablePath? pattern)
-    {
-        if (pattern is not null)
-            ExcludePatterns.Remove(pattern);
+        get => _settings.ExcludePaths is not null
+            ? string.Join("; ", _settings.ExcludePaths.Select(p => p.Trim('*', '\\')))
+            : "";
+        set
+        {
+            _settings.ExcludePaths = (value ?? "")
+                .Split([';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(p => $"*\\{p.Trim().Trim('*', '\\')}")
+                .Where(p => p.Length > 2)
+                .ToList();
+            OnPropertyChanged();
+        }
     }
 
     // ─── 开机自启 ───
@@ -123,6 +121,23 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     partial void OnMaxResultsChanged(int value)
     {
         _settings.MaxResults = Math.Clamp(value, 10, 500);
+    }
+
+    // ─── 全文索引文件后缀 ───
+
+    public string ExtensionsText
+    {
+        get => string.Join(", ", _settings.ContentIndexExtensions ?? []);
+        set
+        {
+            _settings.ContentIndexExtensions = (value ?? "")
+                .Split([',', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(e => e.Trim().TrimStart('.').ToLowerInvariant())
+                .Where(e => e.Length > 0)
+                .Distinct()
+                .ToList();
+            OnPropertyChanged();
+        }
     }
 
     // ─── 索引管理（新增） ───
@@ -253,17 +268,23 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
         // 先同步设置中的索引路径到 SearchService
         _settings.IndexPaths = IndexPaths.Select(p => p.Path).ToList();
-        _settings.ExcludePaths = ExcludePatterns.Select(p => p.Path).ToList();
         _settings.Theme = ThemeIndex;
         _settings.AutoStart = AutoStart;
         _settings.MaxResults = MaxResults;
         _settings.Save();
 
-        // 更新驱动器（取第一条路径首字符）+ 设置索引路径列表
-        var paths = _settings.IndexPaths.Count > 0
-            ? _settings.IndexPaths.ToList()
-            : new List<string> { "C:\\" };
+        // 设置索引路径列表
+        var paths = _settings.IndexPaths.ToList();
+        if (paths.Count == 0)
+        {
+            System.Windows.MessageBox.Show("请先添加索引路径", "提示",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            return;
+        }
         _searchService.SetIndexPaths(paths);
+
+        // 设置全文索引后缀
+        _searchService.SetContentExtensions(_settings.ContentIndexExtensions);
 
         try
         {
@@ -334,7 +355,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private void Save()
     {
         _settings.IndexPaths = IndexPaths.Select(p => p.Path).ToList();
-        _settings.ExcludePaths = ExcludePatterns.Select(p => p.Path).ToList();
         _settings.Theme = ThemeIndex;
         _settings.AutoStart = AutoStart;
         _settings.MaxResults = MaxResults;

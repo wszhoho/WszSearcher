@@ -273,36 +273,28 @@
                 <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                         CornerRadius="6" Padding="16,12" Margin="0,0,0,8">
                     <StackPanel>
-                        <TextBlock Text="跳过匹配以下模式的路径（每行一个通配符）："
+                        <TextBlock Text="跳过匹配以下模式的目录（逗号分隔）："
                                    FontSize="12"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
-                                   Margin="0,0,0,8" />
+                                   Margin="0,0,0,6" />
+                        <TextBox Text="{Binding ExcludePatternsText, UpdateSourceTrigger=PropertyChanged}"
+                                 Height="56" TextWrapping="Wrap" AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto" />
+                    </StackPanel>
+                </Border>
 
-                        <ItemsControl ItemsSource="{Binding ExcludePatterns}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type vm:ObservablePath}">
-                                    <Grid Margin="0,3">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Grid.Column="0"
-                                                 Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}"
-                                                 Margin="0,0,6,0" />
-                                        <Button Grid.Column="1" Style="{StaticResource DangerButton}"
-                                                Command="{Binding DataContext.RemoveExcludePatternCommand,
-                                                    RelativeSource={RelativeSource AncestorType=Window}}"
-                                                CommandParameter="{Binding}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <Button Content="+ 添加排除"
-                                Style="{StaticResource SecondaryButton}"
-                                Height="30" FontSize="12" Padding="12,0"
-                                HorizontalAlignment="Left" Margin="0,8,0,0"
-                                Command="{Binding AddExcludePatternCommand}" />
+                <!-- ─── 全文索引文件类型 ─── -->
+                <TextBlock Style="{StaticResource SectionTitle}" Text="全文索引文件类型" />
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                        CornerRadius="6" Padding="16,12" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="对以下后缀建立内容索引（逗号分隔，不含点）："
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,0,0,6" />
+                        <TextBox Text="{Binding ExtensionsText, UpdateSourceTrigger=PropertyChanged}"
+                                 Height="56" TextWrapping="Wrap" AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto" />
                     </StackPanel>
                 </Border>
 

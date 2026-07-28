@@ -270,7 +270,7 @@ public partial class MainWindow : Window
         var screenWidth = SystemParameters.PrimaryScreenWidth;
         Width = Math.Min(_settings.WindowWidth, screenWidth * 0.6);
         Left = (screenWidth - Width) / 2;
-        Top = 60;
+        Top = SystemParameters.PrimaryScreenHeight / 3;
 
         Show();
         Activate();

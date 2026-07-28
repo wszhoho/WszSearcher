@@ -26,8 +26,11 @@ public interface ISearchService
     /// <summary>重建索引（清空后重新扫描+索引）</summary>
     Task RebuildIndexAsync();
 
-    /// <summary>设置内容索引扫描路径（设置变更后调用）</summary>
+    /// <summary>设置内容索引扫描路径</summary>
     void SetIndexPaths(List<string> paths);
+
+    /// <summary>设置内容索引文件后缀</summary>
+    void SetContentExtensions(List<string> extensions);
 
     /// <summary>当前搜索状态</summary>
     SearchStatus Status { get; }

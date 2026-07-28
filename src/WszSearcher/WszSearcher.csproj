@@ -28,10 +28,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <PublishAot>true</PublishAot>
     <SelfContained>true</SelfContained>
-    <TrimMode>full</TrimMode>
-    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
