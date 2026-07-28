@@ -53,16 +53,15 @@ public class SearchService : ISearchService, IDisposable
         }
     }
 
-    /// <summary>设置内容索引的文件后缀（文件名过滤暂默认关闭）</summary>
+    /// <summary>设置内容索引的文件后缀（同时用于文件名过滤）</summary>
     public void SetContentExtensions(List<string> extensions)
     {
         _contentExts = extensions ?? [];
-        // 文件名后缀过滤暂时不启用（需要用户明确开启）
-        // _fileNameSearch.SetExtensionFilter(_contentExts);
+        _fileNameSearch.SetExtensionFilter(_contentExts);
     }
 
     /// <summary>文件名索引文件总数</summary>
-    public int FileNameIndexCount => _fileNameSearch.GetIndex().CountInPaths(_indexPaths);
+    public int FileNameIndexCount => _fileNameSearch.GetIndex().CountInPaths(_indexPaths, _contentExts);
 
     /// <summary>内容索引文档总数</summary>
     public int ContentIndexCount => _contentIndexer.IsReady

@@ -19,16 +19,20 @@ public class FileNameIndex : IDisposable
     /// <summary>索引文件总数</summary>
     public int Count => _count;
 
-    /// <summary>统计在指定路径范围内的文件数</summary>
-    public int CountInPaths(IReadOnlyList<string> paths)
+    /// <summary>统计在指定路径和扩展名范围内的文件数</summary>
+    public int CountInPaths(IReadOnlyList<string> paths, IReadOnlyList<string>? extensions = null)
     {
         if (paths.Count == 0) return 0;
         _lock.EnterReadLock();
         try
         {
             var ps = paths.Select(p => p.EndsWith('\\') ? p : p + "\\").ToList();
-            return _allFiles.Count(f => ps.Any(p =>
-                f.FullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)));
+            var exts = extensions is not null && extensions.Count > 0
+                ? new HashSet<string>(extensions.Select(e => "." + e.TrimStart('.')), StringComparer.OrdinalIgnoreCase)
+                : null;
+            return _allFiles.Count(f =>
+                ps.Any(p => f.FullPath.StartsWith(p, StringComparison.OrdinalIgnoreCase)) &&
+                (exts is null || exts.Contains(Path.GetExtension(f.FullPath))));
         }
         finally { _lock.ExitReadLock(); }
     }

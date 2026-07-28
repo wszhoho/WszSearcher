@@ -12,13 +12,7 @@ public static class AppLog
 
     private static void Write(string category, string msg)
     {
-        try
-        {
-            var line = $"{DateTime.Now:HH:mm:ss} {msg}";
-            var path = Path.Combine(Dir, $"wszs_{category}.txt");
-            File.AppendAllText(path, line + Environment.NewLine);
-            System.Diagnostics.Debug.WriteLine($"[{category}] {line}");
-        }
-        catch { }
+        // 日志已关闭
+        // try { File.AppendAllText(Path.Combine(Dir, $"wszs_{category}.txt"), $"{DateTime.Now:HH:mm:ss} {msg}{Environment.NewLine}"); } catch { }
     }
 }
