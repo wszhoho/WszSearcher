@@ -19,9 +19,6 @@ public class AppSettings
     public double? WindowLeft { get; set; }
     public double? WindowTop { get; set; }
 
-    /// <summary>主题：0=浅色 1=深色 2=跟随系统</summary>
-    public int Theme { get; set; } = 2;
-
     /// <summary>索引路径列表</summary>
     public List<string> IndexPaths { get; set; } = [];
 

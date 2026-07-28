@@ -6,10 +6,11 @@ Windows 极速文件搜索工具，Everything 级别的文件名匹配 + 中文�
 
 - **毫秒级文件名搜索** — 基于 NTFS USN Journal 直接读取 MFT，无需遍历目录
 - **中文全文搜索** — Lucene.NET 倒排索引 + jieba 中文分词
-- **全局热键** — `Alt+Space` 呼出/隐藏，支持自定义快捷键
-- **浮动预览** — 选中结果自动弹出预览窗口，吸附主窗口右侧
-- **深色/浅色/跟随系统** — 三档主题实时切换
-- **系统托盘** — 最小化到托盘，开机自启
+- **全局热键** — `Alt+Space` 呼出/隐藏，支持自定义快捷键及冲突检测
+- **浮动预览** — 选中结果弹出预览窗口，吸附主窗口右侧、支持拖离拖回
+- **预览高亮** — 搜索词黄色高亮，▲▼按钮导航匹配位置，一键复制全文
+- **右键菜单** — 打开文件 / 打开文件位置 / 复制文件 / 复制文件名
+- **系统托盘** — 最小化到托盘，支持开机自启
 
 ## 技术栈
 
@@ -53,17 +54,17 @@ src/
 │   └── Models/SearchResult.cs      # 搜索结果模型
 │
 └── WszSearcher/                     # WPF 前端
-    ├── App.xaml/.cs                 # 启动入口、托盘菜单、主题切换
+    ├── App.xaml/.cs                 # 启动入口、托盘菜单、开机自启
     ├── MainWindow.xaml/.cs          # 主搜索窗口（无边框、WM_NCHITTEST 拖动）
     ├── Converters/                  # 值转换器
     ├── Services/
     │   ├── AppSettings.cs           # 设置持久化（%LocalAppData%）
     │   ├── GlobalHotkeyService.cs   # Win32 RegisterHotKey 封装
-    │   └── ThemeManager.cs          # 动态主题切换
-    ├── Styles/Theme.xaml            # 主题资源字典（颜色/画笔/样式）
+    │   └── GlobalHotkeyService.cs   # Win32 RegisterHotKey 封装
+    ├── Styles/Theme.xaml            # 样式资源字典（颜色/画笔/样式）
     ├── ViewModels/
     │   ├── MainViewModel.cs         # 主窗口 VM（搜索/防抖/预览/展开）
-    │   ├── SettingsViewModel.cs     # 设置窗口 VM（索引/快捷键/主题）
+    │   ├── SettingsViewModel.cs     # 设置窗口 VM（索引/快捷键）
     │   └── SearchResultViewModel.cs # 搜索结果 VM
     ├── Views/
     │   ├── SettingsWindow.xaml/.cs  # 设置窗口

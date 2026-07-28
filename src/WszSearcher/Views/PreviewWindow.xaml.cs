@@ -130,7 +130,7 @@ public partial class PreviewWindow : Window
             return;
         }
 
-        // 构建 RichTextBox
+        // 构建 RichTextBox（默认文本样式）
         var rtb = new System.Windows.Controls.RichTextBox
         {
             IsReadOnly = true,
@@ -138,7 +138,9 @@ public partial class PreviewWindow : Window
             FontSize = 13,
             FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei"),
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Background = System.Windows.Media.Brushes.Transparent,
+            Foreground = TryFindResource("TextPrimaryBrush") as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.Black
         };
         rtb.Resources.Add(typeof(Paragraph), new Style(typeof(Paragraph)) { Setters = { new Setter(Paragraph.MarginProperty, new Thickness(0)) } });
 
@@ -156,9 +158,6 @@ public partial class PreviewWindow : Window
                 rtb.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x33, 0x33, 0x33));
                 rtb.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xE0, 0x82));
                 rtb.BorderThickness = new Thickness(1);
-                break;
-            default:
-                rtb.Background = System.Windows.Media.Brushes.Transparent;
                 break;
         }
 

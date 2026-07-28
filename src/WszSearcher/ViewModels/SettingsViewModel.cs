@@ -20,7 +20,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _searchService = searchService;
 
         // 加载现有设置
-        ThemeIndex = settings.Theme;
         _autoStart = settings.AutoStart;
         _maxResults = settings.MaxResults;
 
@@ -44,20 +43,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         // 同步当前状态（可能在窗口打开前已变更）
         OnSearchStatusChanged(_searchService.Status);
         UpdateIndexCounts();
-    }
-
-    // ─── 主题 ───
-
-    [ObservableProperty]
-    private int _themeIndex;
-
-    public List<string> ThemeOptions { get; } = ["浅色", "深色", "跟随系统"];
-
-    partial void OnThemeIndexChanged(int value)
-    {
-        if (_settings is null) return;
-        _settings.Theme = value;
-        ApplyTheme(value);
     }
 
     // ─── 索引路径 ───
@@ -269,7 +254,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
         // 先同步设置中的索引路径到 SearchService
         _settings.IndexPaths = IndexPaths.Select(p => p.Path).ToList();
-        _settings.Theme = ThemeIndex;
         _settings.AutoStart = AutoStart;
         _settings.MaxResults = MaxResults;
         _settings.Save();
@@ -356,7 +340,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private void Save()
     {
         _settings.IndexPaths = IndexPaths.Select(p => p.Path).ToList();
-        _settings.Theme = ThemeIndex;
         _settings.AutoStart = AutoStart;
         _settings.MaxResults = MaxResults;
 
@@ -369,9 +352,29 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         if (System.Windows.Application.Current is App app)
             app.ApplyHotkey(_settings.HotkeyModifiers, _settings.HotkeyKey);
 
+        // 开机自启
+        SetAutoStart(_settings.AutoStart);
+
         // 通知用户
         System.Windows.MessageBox.Show("设置已保存。",
             "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private static void SetAutoStart(bool enable)
+    {
+        try
+        {
+            var rk = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Run", true);
+            if (rk is null) return;
+
+            if (enable)
+                rk.SetValue("WszSearcher", $"\"{Environment.ProcessPath}\"");
+            else
+                rk.DeleteValue("WszSearcher", false);
+            rk.Close();
+        }
+        catch { /* 权限不足时跳过 */ }
     }
 
     [RelayCommand]
@@ -385,17 +388,6 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     {
         new Views.AboutWindow { Owner = System.Windows.Application.Current.Windows.OfType<Window>().FirstOrDefault() }
             .ShowDialog();
-    }
-
-    /// <summary>立即应用主题</summary>
-    private static void ApplyTheme(int themeIndex)
-    {
-        switch (themeIndex)
-        {
-            case 0: ThemeManager.SetTheme(false); break;
-            case 1: ThemeManager.SetTheme(true); break;
-            case 2: ThemeManager.FollowSystemTheme(); break;
-        }
     }
 }
 

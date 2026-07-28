@@ -152,19 +152,6 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
 
-                <!-- ─── 外观 ─── -->
-                <TextBlock Style="{StaticResource SectionTitle}" Text="外观" />
-                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                        CornerRadius="6" Padding="16,12" Margin="0,0,0,8">
-                    <StackPanel>
-                        <TextBlock Text="主题模式" FontSize="13"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6" />
-                        <ComboBox ItemsSource="{Binding ThemeOptions}"
-                                  SelectedIndex="{Binding ThemeIndex, Mode=TwoWay}"
-                                  Width="180" Height="32" FontSize="13" />
-                    </StackPanel>
-                </Border>
-
                 <!-- ─── 快捷键 ─── -->
                 <TextBlock Style="{StaticResource SectionTitle}" Text="全局快捷键" />
                 <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"

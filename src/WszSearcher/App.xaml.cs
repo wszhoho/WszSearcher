@@ -24,8 +24,8 @@ namespace WszSearcher;
         // 加载设置
         _settings = AppSettings.Load();
 
-        // 应用主题
-        ApplySavedTheme();
+        // 同步开机自启注册表
+        SyncAutoStart();
 
         // 注入
         var driveLetter = _settings.IndexPaths.Count > 0 && _settings.IndexPaths[0].Length > 0
@@ -66,15 +66,21 @@ namespace WszSearcher;
         }
     }
 
-    private void ApplySavedTheme()
+    private void SyncAutoStart()
     {
-        if (_settings is null) return;
-        switch (_settings.Theme)
+        try
         {
-            case 0: ThemeManager.SetTheme(false); break;
-            case 1: ThemeManager.SetTheme(true); break;
-            case 2: ThemeManager.FollowSystemTheme(); break;
+            var rk = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Run", true);
+            if (rk is null || _settings is null) return;
+
+            if (_settings.AutoStart)
+                rk.SetValue("WszSearcher", $"\"{Environment.ProcessPath}\"");
+            else
+                rk.DeleteValue("WszSearcher", false);
+            rk.Close();
         }
+        catch { }
     }
 
     private void OnTrayLeftClick(object sender, RoutedEventArgs e)
