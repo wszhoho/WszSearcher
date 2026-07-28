@@ -127,7 +127,7 @@
                             </Style.Triggers>
                         </Style>
                     </StackPanel.Style>
-                    <TextBlock Text="正在建立文件索引..."
+                    <TextBlock Text="正在建立文件名索引..."
                                FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"
                                HorizontalAlignment="Center" Margin="0,0,0,8" />
                     <ProgressBar Width="200" Height="4" IsIndeterminate="True"

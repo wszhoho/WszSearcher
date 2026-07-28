@@ -163,7 +163,7 @@ public class SearchService : ISearchService, IDisposable
         {
             Status = SearchStatus.Indexing;
             StatusChanged?.Invoke(Status);
-            StatusMessage?.Invoke("正在建立文件索引...");
+            StatusMessage?.Invoke("正在建立文件名索引...");
             try
             {
                 await _fileNameSearch.InitializeAsync();

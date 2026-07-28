@@ -132,6 +132,9 @@ public class PreviewService : IPreviewService
             };
         }
 
+        // 去除连续空行（不保留空行）
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\n{2,}", "\n");
+
         // 限制行数
         var lines = text.Split('\n');
         if (lines.Length > MaxPreviewLines)

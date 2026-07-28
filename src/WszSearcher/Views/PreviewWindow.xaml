@@ -36,13 +36,27 @@
                                TextTrimming="CharacterEllipsis"
                                Margin="0,2,0,0" />
                 </StackPanel>
-                <Button Grid.Column="1" Width="24" Height="24"
-                        Background="Transparent" BorderThickness="0"
-                        FontSize="14"
-                        Foreground="{DynamicResource TextSecondaryBrush}"
-                        Cursor="Hand"
-                        Command="{Binding HidePreviewCommand}"
-                        Content="✕" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <!-- 高亮词导航 -->
+                    <Button Width="28" Height="24" Click="OnPrevMatch"
+                            Background="Transparent" BorderThickness="0"
+                            FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
+                            Cursor="Hand" Content="▲" ToolTip="上一个" />
+                    <TextBlock x:Name="MatchLabel" Text="" FontSize="10"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center" Margin="4,0" />
+                    <Button Width="28" Height="24" Click="OnNextMatch"
+                            Background="Transparent" BorderThickness="0"
+                            FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
+                            Cursor="Hand" Content="▼" ToolTip="下一个" />
+                    <Button Width="24" Height="24" Margin="8,0,0,0"
+                            Background="Transparent" BorderThickness="0"
+                            FontSize="14"
+                            Foreground="{DynamicResource TextSecondaryBrush}"
+                            Cursor="Hand"
+                            Command="{Binding HidePreviewCommand}"
+                            Content="✕" />
+                </StackPanel>
             </Grid>
         </Border>
 
