@@ -23,6 +23,9 @@ public interface ISearchService
     /// <summary>初始化（首次全量建索引）</summary>
     Task InitializeAsync();
 
+    /// <summary>快速初始化：仅扫文件名，内容索引从磁盘恢复（启动时用）</summary>
+    Task QuickInitAsync();
+
     /// <summary>重建索引（清空后重新扫描+索引）</summary>
     Task RebuildIndexAsync();
 

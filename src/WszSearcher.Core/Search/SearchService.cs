@@ -93,6 +93,36 @@ public class SearchService : ISearchService, IDisposable
     public int ContentIndexCount => _contentIndexer.DocCount;
 
     /// <summary>
+    /// 启动快速初始化：仅扫文件名（秒级），内容索引从磁盘恢复
+    /// 用于软件重启后恢复搜索能力，不触发慢速内容重建
+    /// </summary>
+    public async Task QuickInitAsync()
+    {
+        Status = SearchStatus.Indexing;
+        StatusChanged?.Invoke(Status);
+
+        // 1. 只做文件名扫描（USN，秒级）
+        StatusMessage?.Invoke("正在加载文件名索引...");
+        await _fileNameSearch.InitializeAsync();
+
+        // 2. 内容索引：磁盘有就加载，没有就跳过（等用户手动重建）
+        if (_contentIndexer.IndexExists())
+        {
+            _contentIndexer.IsReady = true;
+            _contentIndexer.SyncDocCount();
+            _contentSearcher.RefreshReadyState();
+            StatusMessage?.Invoke("内容索引已就绪");
+        }
+        else
+        {
+            StatusMessage?.Invoke("内容索引未建立，请在设置中手动重建");
+        }
+
+        Status = SearchStatus.Ready;
+        StatusChanged?.Invoke(Status);
+    }
+
+    /// <summary>
     /// 初始化：先建文件名索引（USN Journal），再触发内容索引
     /// </summary>
     public async Task InitializeAsync()
