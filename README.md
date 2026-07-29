@@ -1,3 +1,4 @@
+
 # WszSearcher
 
 基于 USN Journal + Lucene.NET 的 Windows 极速文件搜索工具。毫秒级文件名索引，配合中文全文搜索和拼音模糊匹配。
@@ -16,6 +17,9 @@
 - **增量监听** — FileSystemWatcher 自动保持索引实时更新
 - **单实例保护** — 只允许一个进程运行
 - **便携绿色** — 所有设置存储在 exe 同级目录，不写入系统目录
+
+<img width="648" height="361" alt="1" src="https://github.com/user-attachments/assets/a484161d-2de5-4de8-b8ee-57c37f50791d" />
+<img width="913" height="448" alt="3" src="https://github.com/user-attachments/assets/db616c65-382f-4f00-8b1e-fd43bd8986a8" />
 
 ## 技术栈
 
