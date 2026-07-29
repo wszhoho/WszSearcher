@@ -105,7 +105,7 @@ src/
 - **操作系统**：Windows 10 1607+（LTSC/Enterprise）/ Windows 11 / Windows Server 2012 R2+
 - **运行时**：[.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
 - **文件系统**：NTFS（USN Journal 特性依赖）
-- **权限**：管理员权限下获得 Everything 级扫描速度；普通权限自动降级为目录遍历
+- **权限**：管理员权限下获得毫秒级扫描速度；普通权限自动降级为目录遍历
 
 ## 构建
 
