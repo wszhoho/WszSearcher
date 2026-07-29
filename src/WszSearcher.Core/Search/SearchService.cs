@@ -166,6 +166,8 @@ public class SearchService : ISearchService, IDisposable
             StatusMessage?.Invoke("内容索引已就绪");
         }
 
+        _contentIndexer.CloseWriter(); // 释放 Lucene 内存
+
         Status = SearchStatus.Ready;
         StatusChanged?.Invoke(Status);
         StartContentWatcher();
@@ -211,6 +213,7 @@ public class SearchService : ISearchService, IDisposable
         {
             _contentIndexer.DocCount = 0;
             StatusMessage?.Invoke("内容索引已取消");
+            _contentIndexer.CloseWriter();
             FinishWithCancel(ct, "内容");
             return;
         }
@@ -218,6 +221,8 @@ public class SearchService : ISearchService, IDisposable
         {
             StatusMessage?.Invoke($"内容索引重建失败：{ex.Message}");
         }
+
+        _contentIndexer.CloseWriter(); // 释放 Lucene 内存
 
         Status = SearchStatus.Ready;
         StatusChanged?.Invoke(Status);

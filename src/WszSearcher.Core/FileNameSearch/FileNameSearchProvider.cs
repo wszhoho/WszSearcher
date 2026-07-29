@@ -179,16 +179,25 @@ public class FileNameSearchProvider : IDisposable
             return [];
 
         var files = _index.Search(query, paths ?? Array.Empty<string>(), maxResults);
-        return files.Select(f => new SearchResult
+        var results = files.Select(f => new SearchResult
+            {
+                FileName = f.FileName,
+                FullPath = f.FullPath,
+                FileSize = f.FileSize,
+                LastModified = f.LastModified,
+                ResultType = SearchResultType.FileName,
+                Score = CalculateScore(query, f.FileName)
+            }).ToList();
+
+        // 对未获取到文件大小的结果做懒加载（USN V2 记录无 FileSize，仅对搜索结果生效）
+        foreach (var r in results)
         {
-            FileName = f.FileName,
-            FullPath = f.FullPath,
-            Directory = f.Directory,
-            FileSize = f.FileSize,
-            LastModified = f.LastModified,
-            ResultType = SearchResultType.FileName,
-            Score = CalculateScore(query, f.FileName)
-        }).ToList();
+            if (r.FileSize == 0)
+            {
+                try { r.FileSize = new System.IO.FileInfo(r.FullPath).Length; } catch { }
+            }
+        }
+        return results;
     }
 
     /// <summary>计算匹配分数（前缀 > 包含 > 路径）</summary>
@@ -258,7 +267,6 @@ public class FileNameSearchProvider : IDisposable
                 {
                     FileName = fi.Name,
                     FullPath = fi.FullName,
-                    Directory = fi.DirectoryName ?? "",
                     NamePinyin = Analysis.PinyinHelper.GetFirstLetters(fi.Name),
                     NameFullPinyin = Analysis.PinyinHelper.GetPinyin(fi.Name),
                     FileSize = fi.Length,
@@ -291,7 +299,6 @@ public class FileNameSearchProvider : IDisposable
                 {
                     FileName = fi.Name,
                     FullPath = fi.FullName,
-                    Directory = fi.DirectoryName ?? "",
                     NamePinyin = Analysis.PinyinHelper.GetFirstLetters(fi.Name),
                     NameFullPinyin = Analysis.PinyinHelper.GetPinyin(fi.Name),
                     FileSize = fi.Length,
@@ -316,7 +323,6 @@ public class FileNameSearchProvider : IDisposable
                 {
                     FileName = fi.Name,
                     FullPath = fi.FullName,
-                    Directory = fi.DirectoryName ?? "",
                     NamePinyin = Analysis.PinyinHelper.GetFirstLetters(fi.Name),
                     NameFullPinyin = Analysis.PinyinHelper.GetPinyin(fi.Name),
                     FileSize = fi.Length,

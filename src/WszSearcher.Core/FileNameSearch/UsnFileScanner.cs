@@ -106,7 +106,7 @@ public class UsnFileScanner
                 {
                     FileName = record.FileName,
                     FullPath = absolutePath,
-                    Directory = Path.GetDirectoryName(absolutePath) ?? "",
+                    FileSize = record.FileSize,
                     NamePinyin = Analysis.PinyinHelper.GetFirstLetters(record.FileName),
                     NameFullPinyin = Analysis.PinyinHelper.GetPinyin(record.FileName),
                     LastModified = record.TimeStamp.ToLocalTime(),
@@ -206,7 +206,6 @@ public class UsnFileScanner
                         {
                             FileName = fi.Name,
                             FullPath = fi.FullName,
-                            Directory = fi.DirectoryName ?? "",
                             NamePinyin = Analysis.PinyinHelper.GetFirstLetters(fi.Name),
                             NameFullPinyin = Analysis.PinyinHelper.GetPinyin(fi.Name),
                             FileSize = fi.Length,

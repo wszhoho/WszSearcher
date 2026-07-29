@@ -75,7 +75,6 @@ public class ContentSearcher : IDisposable
                 {
                     FileName = fileName,
                     FullPath = filePath,
-                    Directory = Path.GetDirectoryName(filePath) ?? "",
                     FileSize = GetFileSize(filePath),
                     LastModified = GetLastModified(filePath),
                     ResultType = SearchResultType.Content,

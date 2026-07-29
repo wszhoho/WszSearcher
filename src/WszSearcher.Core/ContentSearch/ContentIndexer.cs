@@ -271,6 +271,18 @@ public class ContentIndexer : IDisposable
         }
     }
 
+    /// <summary>关闭 IndexWriter，释放内存。下次写入时自动重新打开</summary>
+    public void CloseWriter()
+    {
+        lock (_writerLock)
+        {
+            if (_writer is null || _writerClosed) return;
+            _writer.Dispose();
+            _writer = null;
+            _writerClosed = true;
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

@@ -303,6 +303,11 @@ internal static class UsnApi
             fileName = ""; // 损坏记录，跳过文件名
         }
 
+        // USN_RECORD_V3 在 V2 的 60 字节头部末尾增加了 FileSize 字段（8 字节，偏移 60）
+        long fileSize = 0;
+        if (isV3)
+            fileSize = Marshal.ReadInt64(ptr, 60);
+
         return new UsnRecord
         {
             RecordLength = recordLength,
@@ -317,7 +322,8 @@ internal static class UsnApi
             SecurityId = securityId,
             FileAttributes = fileAttributes,
             FileName = fileName,
-            FileNameLength = fileNameLength
+            FileNameLength = fileNameLength,
+            FileSize = fileSize
         };
     }
 }
@@ -373,6 +379,8 @@ internal class UsnRecord
     public uint FileAttributes { get; init; }
     public string FileName { get; init; } = "";
     public ushort FileNameLength { get; init; }
+    /// <summary>文件大小（字节，仅 V3 格式）</summary>
+    public long FileSize { get; init; }
 
     public bool IsDirectory => (FileAttributes & 0x10) != 0;
     public bool IsDeleted => (Reason & 0x200) != 0;
