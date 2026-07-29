@@ -5,7 +5,7 @@
 ## 功能
 
 - **毫秒级文件名搜索** — NTFS USN Journal 直接读取 MFT，无需遍历目录
-- **中文全文搜索** — Lucene.NET 倒排索引 + jieba 中文分词 + ToolGood.Words 拼音
+- **毫秒级中文全文搜索** — Lucene.NET 倒排索引 + jieba 中文分词 + ToolGood.Words 拼音
 - **拼音模糊搜索** — 支持拼音首字母（`wj` → `文件`）和全拼（`wenjian` → `文件`）
 - **多盘多目录** — 支持跨盘符多目录索引
 - **全局热键** — 默认 `Alt+Space` 呼出/隐藏，支持自定义快捷键及冲突检测
