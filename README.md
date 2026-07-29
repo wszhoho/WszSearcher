@@ -17,6 +17,9 @@
 - **单实例保护** — 只允许一个进程运行
 - **便携绿色** — 所有设置存储在 exe 同级目录，不写入系统目录
 
+
+<img width="651" height="324" alt="1" src="https://github.com/user-attachments/assets/7f64ad09-0be2-4da6-9d59-37bf9965f64e" />
+<img width="918" height="456" alt="3" src="https://github.com/user-attachments/assets/0a7a74eb-ee5d-445c-be6b-7a7f4c46987c" />
 ## 技术栈
 
 | 组件 | 用途 |
