@@ -135,7 +135,11 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private int _indexProgress;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNotIndexing))]
     private bool _isIndexing;
+
+    /// <summary>是否未在索引中（用于按钮可见性绑定）</summary>
+    public bool IsNotIndexing => !IsIndexing;
 
     [ObservableProperty]
     private string _fileNameCount = "—";
@@ -284,6 +288,13 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         {
             IndexStatusMessage = $"重建失败：{ex.Message}";
         }
+    }
+
+    /// <summary>停止索引命令</summary>
+    [RelayCommand]
+    private void StopIndex()
+    {
+        _searchService.CancelIndex();
     }
 
     /// <summary>刷新索引统计</summary>

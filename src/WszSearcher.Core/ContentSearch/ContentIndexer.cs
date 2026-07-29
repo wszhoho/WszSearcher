@@ -30,7 +30,7 @@ public class ContentIndexer : IDisposable
     public event Action<int>? ProgressChanged;
 
     /// <summary>当前索引中的文档总数</summary>
-    public int DocCount { get; private set; }
+    public int DocCount { get; set; }
 
     /// <summary>索引是否就绪（volatile 确保跨线程可见）</summary>
     public volatile bool IsReady;
@@ -116,6 +116,7 @@ public class ContentIndexer : IDisposable
                 var n = Interlocked.Increment(ref count);
                 if (n % reportInterval == 0)
                 {
+                    DocCount = n; // 实时更新文档计数
                     var mh = StatusChanged; mh?.Invoke($"内容索引中... 已处理 {n} 个文件");
                     var ph = ProgressChanged; ph?.Invoke(n);
                 }

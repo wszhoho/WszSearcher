@@ -50,7 +50,7 @@
                            Margin="0,0,0,8" />
                 <TextBlock FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}"
                            TextWrapping="Wrap" LineHeight="22">
-WszSearcher 是一款 Windows 极速文件搜索工具，基于 NTFS USN Journal 实现毫秒级文件名匹配，配合 Lucene.NET 全文索引和结巴中文分词实现高效的内容搜索。支持 Alt+Space 全局热键快速唤起，搜索结果实时预览，深色/浅色主题一键切换。
+基于 USN Journal + Lucene.NET，实现毫秒级文件名和内容检索。jieba 中文分词、拼音首字母/全拼辅助模糊匹配。支持多盘多目录索引、自定义全局快捷键、浮动文件预览、系统托盘驻留。便携绿色版，不写入系统目录。
                 </TextBlock>
 
                 <!-- 技术栈 -->
@@ -70,6 +70,13 @@ WszSearcher 是一款 Windows 极速文件搜索工具，基于 NTFS USN Journal
                                        Foreground="{DynamicResource TextSecondaryBrush}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="Win32 USN Journal API"
+                                       Width="180" FontSize="12"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="NTFS MFT 毫秒级扫描" FontSize="11"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
                             <TextBlock Text="Lucene.NET 3.0.3"
                                        Width="180" FontSize="12"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -77,13 +84,22 @@ WszSearcher 是一款 Windows 极速文件搜索工具，基于 NTFS USN Journal
                                        Foreground="{DynamicResource TextSecondaryBrush}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,4">
-                            <TextBlock Text="jieba.NET" Width="180" FontSize="12"
+                            <TextBlock Text="jieba.NET"
+                                       Width="180" FontSize="12"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
                             <TextBlock Text="中文分词" FontSize="11"
                                        Foreground="{DynamicResource TextSecondaryBrush}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,4">
-                            <TextBlock Text="PdfPig" Width="180" FontSize="12"
+                            <TextBlock Text="ToolGood.Words"
+                                       Width="180" FontSize="12"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="拼音首字母模糊搜索" FontSize="11"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="PdfPig"
+                                       Width="180" FontSize="12"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
                             <TextBlock Text="PDF 文档解析" FontSize="11"
                                        Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -99,7 +115,7 @@ WszSearcher 是一款 Windows 极速文件搜索工具，基于 NTFS USN Journal
                             <TextBlock Text="Hardcodet.NotifyIcon.Wpf"
                                        Width="180" FontSize="12"
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
-                            <TextBlock Text="系统托盘" FontSize="11"
+                            <TextBlock Text="系统托盘驻留" FontSize="11"
                                        Foreground="{DynamicResource TextSecondaryBrush}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,4">

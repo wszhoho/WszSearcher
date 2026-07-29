@@ -4,23 +4,23 @@ namespace WszSearcher.Core.FileNameSearch;
 
 /// <summary>
 /// 文件名搜索提供者——包装 USN 扫描 + 内存索引 + 文件监听
-/// 对外提供统一的文件名搜索接口
+/// 支持多盘符，对外提供统一的文件名搜索接口
 /// </summary>
 public class FileNameSearchProvider : IDisposable
 {
     private readonly FileNameIndex _index = new();
-    private char _driveLetter;
+    private List<char> _drives = []; // 多盘符支持
 
-    /// <summary>当前扫描驱动器</summary>
-    public char DriveLetter => _driveLetter;
+    /// <summary>当前扫描驱动器列表</summary>
+    public IReadOnlyList<char> Drives => _drives;
 
     /// <summary>更新扫描驱动器</summary>
     private List<string> _fallbackPaths = []; // Fallback 遍历路径
 
-    public void SetDrive(char driveLetter)
+    /// <summary>设置扫描驱动器（清空旧列表后设置）</summary>
+    public void SetDrives(IEnumerable<char> drives)
     {
-        if (_driveLetter == driveLetter) return;
-        _driveLetter = driveLetter;
+        _drives = drives.Distinct().ToList();
     }
 
     /// <summary>设置 Fallback 遍历路径（USN 不可用时使用）</summary>
@@ -28,10 +28,11 @@ public class FileNameSearchProvider : IDisposable
     {
         _fallbackPaths = paths;
     }
-    private FileSystemWatcher? _watcher;
+    private List<FileSystemWatcher> _watchers = []; // 每个盘符一个 FSW
     private int _initialized; // 使用 int + Interlocked 防止 TOCTOU
     private bool _disposed;
     private volatile bool _rebuilding;
+    private CancellationTokenSource? _scanCts; // 扫描取消令牌
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _recentFiles = new();
     private HashSet<string> _extFilter = []; // 文件名后缀过滤
 
@@ -60,8 +61,14 @@ public class FileNameSearchProvider : IDisposable
 
     public FileNameSearchProvider(char driveLetter = 'C')
     {
-        _driveLetter = driveLetter;
+        _drives = [driveLetter];
     }
+    /// <summary>取消正在进行的扫描</summary>
+    public void CancelScan()
+    {
+        _scanCts?.Cancel();
+    }
+
     public async Task InitializeAsync()
     {
         // 原子性 Check-and-Set 防止并发双重初始化
@@ -70,28 +77,57 @@ public class FileNameSearchProvider : IDisposable
         State = IndexState.Scanning;
         InvokeStateChanged(State);
 
-        var scanner = new UsnFileScanner(_driveLetter);
-        scanner.ProgressChanged += count => InvokeProgressChanged(count);
-        scanner.StatusChanged += msg => InvokeStatusMessage(msg);
+        _scanCts?.Dispose();
+        _scanCts = new CancellationTokenSource();
+        var ct = _scanCts.Token;
+
+        var allFiles = new List<FileRecord>();
+
+        foreach (var drive in _drives)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // 过滤出属于当前盘符的 fallback 路径
+            var drivePaths = _fallbackPaths
+                .Where(p => p.Length > 0 && char.ToUpperInvariant(p[0]) == char.ToUpperInvariant(drive))
+                .ToList();
+
+            var scanner = new UsnFileScanner(drive) { CancellationToken = ct };
+            scanner.ProgressChanged += count => InvokeProgressChanged(count);
+            scanner.StatusChanged += msg => InvokeStatusMessage(msg);
+
+            try
+            {
+                var files = await scanner.ScanAllAsync(drivePaths.Count > 0 ? drivePaths : _fallbackPaths);
+                AppLog.Info("fname", $"盘符 {drive}: 扫描完成 {files.Count} 个文件");
+                allFiles.AddRange(files);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                AppLog.Warn("fname", $"盘符 {drive}: 扫描失败 - {ex.Message}");
+            }
+        }
+
+        AppLog.Info("fname", $"全部扫描完成: {allFiles.Count} 个文件 (盘符=[{string.Join(",", _drives)}])");
 
         try
         {
-        var files = await scanner.ScanAllAsync(_fallbackPaths);
-        AppLog.Info("fname", $"USN 扫描完成: {files.Count} 个文件 (盘符={_driveLetter})");
-
-            var filtered = _extFilter.Count == 0 ? files : files.Where(f => PassExtFilter(f.FullPath)).ToList();
+            var filtered = _extFilter.Count == 0 ? allFiles : allFiles.Where(f => PassExtFilter(f.FullPath)).ToList();
             _index.AddRange(filtered);
 
             // 启动文件变更监听
-            StartWatcher();
+            StartWatchers();
 
             State = IndexState.Ready;
             InvokeStatusMessage($"索引就绪，共 {_index.Count} 个文件");
         }
         catch (OperationCanceledException)
         {
-            State = IndexState.Ready;
-            InvokeStatusMessage("索引已取消");
+            State = IndexState.Error; // 取消不视为 Ready，防止继续进入内容索引
+            InvokeStatusMessage("文件名扫描已取消");
+            InvokeStateChanged(State);
+            return; // 不继续后续流程
         }
         catch (Exception ex)
         {
@@ -126,9 +162,8 @@ public class FileNameSearchProvider : IDisposable
     {
         _rebuilding = true; // 标记重建中，防止 FileSystemWatcher 事件修改索引
 
-        // 停止旧的 FileSystemWatcher
-        _watcher?.Dispose();
-        _watcher = null;
+        // 停止所有旧的 FileSystemWatcher
+        StopWatchers();
 
         _index.Clear();
         Interlocked.Exchange(ref _initialized, 0); // 原子重置初始化标记，允许重新初始化
@@ -168,30 +203,46 @@ public class FileNameSearchProvider : IDisposable
         return 0.5;
     }
 
-    /// <summary>启动 FileSystemWatcher 监听文件变更</summary>
-    private void StartWatcher()
+    /// <summary>启动所有盘符的 FileSystemWatcher 监听文件变更</summary>
+    private void StartWatchers()
     {
-        try
+        StopWatchers();
+
+        foreach (var drive in _drives)
         {
-            _watcher = new FileSystemWatcher($@"{_driveLetter}:\")
+            try
             {
-                IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Size | NotifyFilters.LastWrite,
-                InternalBufferSize = 65536
-            };
+                var watcher = new FileSystemWatcher($@"{drive}:\")
+                {
+                    IncludeSubdirectories = true,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Size | NotifyFilters.LastWrite,
+                    InternalBufferSize = 65536
+                };
 
-            _watcher.Created += OnFileCreated;
-            _watcher.Deleted += OnFileDeleted;
-            _watcher.Renamed += OnFileRenamed;
-            _watcher.Changed += OnFileChanged;
-            _watcher.Error += OnWatcherError;
+                watcher.Created += OnFileCreated;
+                watcher.Deleted += OnFileDeleted;
+                watcher.Renamed += OnFileRenamed;
+                watcher.Changed += OnFileChanged;
+                watcher.Error += OnWatcherError;
 
-            _watcher.EnableRaisingEvents = true;
+                watcher.EnableRaisingEvents = true;
+                _watchers.Add(watcher);
+            }
+            catch (Exception ex)
+            {
+                InvokeStatusMessage($"盘符 {drive}: 文件监听启动失败（不影响搜索）：{ex.Message}");
+            }
         }
-        catch (Exception ex)
+    }
+
+    /// <summary>停止所有盘符的 FileSystemWatcher</summary>
+    private void StopWatchers()
+    {
+        foreach (var w in _watchers)
         {
-            InvokeStatusMessage($"文件监听启动失败（不影响搜索）：{ex.Message}");
+            try { w.Dispose(); } catch { }
         }
+        _watchers.Clear();
     }
 
     private void OnFileCreated(object sender, FileSystemEventArgs e)
@@ -316,7 +367,8 @@ public class FileNameSearchProvider : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _watcher?.Dispose();
+        StopWatchers();
+        _scanCts?.Dispose();
         _index.Dispose(); // 释放 ReaderWriterLockSlim
     }
 }

@@ -72,12 +72,9 @@ namespace WszSearcher;
 
         searchService.SetContentExtensions(_settings.ContentIndexExtensions);
 
-        // 有索引路径时才自动初始化
+        // 设置索引路径（不自动建索引，需用户手动在设置中点击"重建索引"）
         if (_settings.IndexPaths.Count > 0)
-        {
             searchService.SetIndexPaths(_settings.IndexPaths);
-            _ = searchService.InitializeAsync();
-        }
     }
 
     private void SyncAutoStart()

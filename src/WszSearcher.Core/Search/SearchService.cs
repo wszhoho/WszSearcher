@@ -47,9 +47,12 @@ public class SearchService : ISearchService, IDisposable
         if (paths.Count > 0)
         {
             _indexPaths = paths;
-            // 同步更新文件名扫描的驱动器
-            var drive = paths[0].Length > 0 ? paths[0][0] : 'C';
-            _fileNameSearch.SetDrive(drive);
+            // 从所有路径中提取唯一的盘符
+            var drives = paths
+                .Where(p => p.Length > 0)
+                .Select(p => char.ToUpperInvariant(p[0]))
+                .Distinct();
+            _fileNameSearch.SetDrives(drives);
             _fileNameSearch.SetFallbackPaths(paths);
         }
         CancelBuild(); // 增删目录时取消正在进行的索引
@@ -57,9 +60,23 @@ public class SearchService : ISearchService, IDisposable
 
     private void CancelBuild()
     {
+        // 只取消不释放——异步任务还在用此 token，释放会导致 ObjectDisposedException
         _buildCts?.Cancel();
+    }
+
+    private void DisposeBuildCts()
+    {
         _buildCts?.Dispose();
         _buildCts = null;
+    }
+
+    /// <summary>取消正在进行的索引构建（供 UI 按钮调用）</summary>
+    public void CancelIndex()
+    {
+        CancelBuild();
+        _fileNameSearch.CancelScan();
+        // 立即归零内容索引计数
+        _contentIndexer.DocCount = 0;
     }
 
     /// <summary>设置内容索引的文件后缀（同时用于文件名过滤）</summary>
@@ -73,9 +90,7 @@ public class SearchService : ISearchService, IDisposable
     public int FileNameIndexCount => _fileNameSearch.GetIndex().CountInPaths(_indexPaths, _contentExts);
 
     /// <summary>内容索引文档总数</summary>
-    public int ContentIndexCount => _contentIndexer.IsReady
-        ? _contentIndexer.DocCount
-        : _contentIndexer.TryGetDocCount();
+    public int ContentIndexCount => _contentIndexer.DocCount;
 
     /// <summary>
     /// 初始化：先建文件名索引（USN Journal），再触发内容索引
@@ -147,10 +162,10 @@ public class SearchService : ISearchService, IDisposable
         StatusMessage?.Invoke("正在建立文件名索引...");
         await _fileNameSearch.RebuildAsync();
 
-        if (_fileNameSearch.State != IndexState.Ready)
+        // 检查是否被取消
+        if (ct.IsCancellationRequested || _fileNameSearch.State != IndexState.Ready)
         {
-            Status = SearchStatus.Ready;
-            StatusChanged?.Invoke(Status);
+            FinishWithCancel(ct, "文件名");
             return;
         }
 
@@ -162,6 +177,13 @@ public class SearchService : ISearchService, IDisposable
                 EnumerateFilesFromPaths(_indexPaths), ct), ct);
             _contentSearcher.RefreshReadyState();
         }
+        catch (OperationCanceledException)
+        {
+            _contentIndexer.DocCount = 0;
+            StatusMessage?.Invoke("内容索引已取消");
+            FinishWithCancel(ct, "内容");
+            return;
+        }
         catch (Exception ex)
         {
             StatusMessage?.Invoke($"内容索引重建失败：{ex.Message}");
@@ -172,6 +194,17 @@ public class SearchService : ISearchService, IDisposable
         StatusMessage?.Invoke($"索引重建完成！文件名 {FileNameIndexCount} 个，内容 {ContentIndexCount} 个");
         _rebuilding = false;
         StartContentWatcher();
+        DisposeBuildCts();
+    }
+
+    /// <summary>取消后的收尾：重置状态、清理令牌</summary>
+    private void FinishWithCancel(CancellationToken ct, string phase)
+    {
+        Status = SearchStatus.Ready;
+        StatusChanged?.Invoke(Status);
+        StatusMessage?.Invoke($"{phase}索引已取消");
+        _rebuilding = false;
+        DisposeBuildCts();
     }
 
     private void StartContentWatcher()
@@ -266,34 +299,13 @@ public class SearchService : ISearchService, IDisposable
         catch (Exception ex) { Debug.WriteLine($"重命名索引失败: {ex.Message}"); }
     }
 
-    private int _fileNameInitStarted; // 0=未启动, 1=已启动（Interlocked 原子操作防 TOCTOU）
-
-    /// <summary>异步搜索：并行搜索文件名和内容，合并去重。首次搜索时自动懒加载文件名索引。</summary>
+    /// <summary>异步搜索：并行搜索文件名和内容，合并去重。</summary>
     public async Task SearchAsync(string query, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
             ResultsUpdated?.Invoke([]);
             return;
-        }
-
-        // 懒加载文件名索引（首次搜索时自动触发，原子 Check-and-Set 防止并发初始化）
-        if (_fileNameSearch.State == IndexState.NotInitialized &&
-            Interlocked.CompareExchange(ref _fileNameInitStarted, 1, 0) == 0)
-        {
-            Status = SearchStatus.Indexing;
-            StatusChanged?.Invoke(Status);
-            StatusMessage?.Invoke("正在建立文件名索引...");
-            try
-            {
-                await _fileNameSearch.InitializeAsync();
-            }
-            catch (Exception ex)
-            {
-                StatusMessage?.Invoke($"索引初始化失败：{ex.Message}");
-            }
-            Status = SearchStatus.Searching;
-            StatusChanged?.Invoke(Status);
         }
 
         Status = SearchStatus.Searching;
