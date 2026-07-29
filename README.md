@@ -5,7 +5,7 @@
 ## 功能
 
 - **毫秒级文件名搜索** — NTFS USN Journal 直接读取 MFT，无需遍历目录
-- **中文全文搜索** — Lucene.NET 倒排索引 + jieba 中文分词 + ToolGood.Words 拼音
+- **毫秒级中文全文搜索** — Lucene.NET 倒排索引 + jieba 中文分词 + ToolGood.Words 拼音
 - **拼音模糊搜索** — 支持拼音首字母（`wj` → `文件`）和全拼（`wenjian` → `文件`）
 - **多盘多目录** — 支持跨盘符多目录索引
 - **全局热键** — 默认 `Alt+Space` 呼出/隐藏，支持自定义快捷键及冲突检测
@@ -17,6 +17,9 @@
 - **单实例保护** — 只允许一个进程运行
 - **便携绿色** — 所有设置存储在 exe 同级目录，不写入系统目录
 
+
+<img width="651" height="324" alt="1" src="https://github.com/user-attachments/assets/7f64ad09-0be2-4da6-9d59-37bf9965f64e" />
+<img width="918" height="456" alt="3" src="https://github.com/user-attachments/assets/0a7a74eb-ee5d-445c-be6b-7a7f4c46987c" />
 ## 技术栈
 
 | 组件 | 用途 |
@@ -105,7 +108,7 @@ src/
 - **操作系统**：Windows 10 1607+（LTSC/Enterprise）/ Windows 11 / Windows Server 2012 R2+
 - **运行时**：[.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
 - **文件系统**：NTFS（USN Journal 特性依赖）
-- **权限**：管理员权限下获得 Everything 级扫描速度；普通权限自动降级为目录遍历
+- **权限**：管理员权限下获得毫秒级扫描速度；普通权限自动降级为目录遍历
 
 ## 构建
 
