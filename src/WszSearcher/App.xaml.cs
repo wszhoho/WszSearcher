@@ -84,15 +84,46 @@ namespace WszSearcher;
     {
         try
         {
-            var rk = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
-                @"Software\Microsoft\Windows\CurrentVersion\Run", true);
-            if (rk is null || _settings is null) return;
+            if (_settings is null) return;
 
             if (_settings.AutoStart)
-                rk.SetValue("WszSearcher", $"\"{Environment.ProcessPath}\"");
+                ScheduleAutoStart();
             else
-                rk.DeleteValue("WszSearcher", false);
-            rk.Close();
+                UnscheduleAutoStart();
+        }
+        catch { }
+    }
+
+    /// <summary>创建计划任务实现开机自启（支持管理员提权）</summary>
+    private static void ScheduleAutoStart()
+    {
+        var exe = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(exe)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "schtasks",
+                Arguments = $"/Create /F /SC ONLOGON /TN \"WszSearcher\" /TR \"\\\"{exe}\\\"\" /RL HIGHEST",
+                UseShellExecute = true,
+                Verb = "runas"
+            })?.WaitForExit(5000);
+        }
+        catch { }
+    }
+
+    /// <summary>删除计划任务</summary>
+    private static void UnscheduleAutoStart()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "schtasks",
+                Arguments = "/Delete /F /TN \"WszSearcher\"",
+                UseShellExecute = true,
+                Verb = "runas"
+            })?.WaitForExit(5000);
         }
         catch { }
     }

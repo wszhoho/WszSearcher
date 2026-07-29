@@ -377,17 +377,32 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
     private static void SetAutoStart(bool enable)
     {
+        var exe = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(exe)) return;
         try
         {
-            var rk = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
-                @"Software\Microsoft\Windows\CurrentVersion\Run", true);
-            if (rk is null) return;
-
             if (enable)
-                rk.SetValue("WszSearcher", $"\"{Environment.ProcessPath}\"");
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "schtasks",
+                    Arguments = $"/Create /F /SC ONLOGON /TN \"WszSearcher\" /TR \"\\\"{exe}\\\"\" /RL HIGHEST",
+                    UseShellExecute = true,
+                    Verb = "runas"
+                };
+                System.Diagnostics.Process.Start(psi)?.WaitForExit(5000);
+            }
             else
-                rk.DeleteValue("WszSearcher", false);
-            rk.Close();
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "schtasks",
+                    Arguments = "/Delete /F /TN \"WszSearcher\"",
+                    UseShellExecute = true,
+                    Verb = "runas"
+                };
+                System.Diagnostics.Process.Start(psi)?.WaitForExit(5000);
+            }
         }
         catch { /* 权限不足时跳过 */ }
     }
