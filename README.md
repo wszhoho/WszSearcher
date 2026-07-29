@@ -1,5 +1,6 @@
 
 # WszSearcher
+我只想愉快的搜索文件，我不想要启动器，嗯，安排。
 
 基于 USN Journal + Lucene.NET 的 Windows 极速文件搜索工具。毫秒级文件名索引，配合中文全文搜索和拼音模糊匹配。
 
