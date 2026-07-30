@@ -192,9 +192,17 @@ public class SearchService : ISearchService, IDisposable
 
         // 1. 文件名索引
         StatusMessage?.Invoke("正在建立文件名索引...");
-        await _fileNameSearch.RebuildAsync();
+        try
+        {
+            await _fileNameSearch.RebuildAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            FinishWithCancel(ct, "文件名");
+            return;
+        }
 
-        // 检查是否被取消
+        // 检查是否被取消（RebuildAsync 正常完成但状态未就绪的情况）
         if (ct.IsCancellationRequested || _fileNameSearch.State != IndexState.Ready)
         {
             FinishWithCancel(ct, "文件名");
@@ -354,7 +362,10 @@ public class SearchService : ISearchService, IDisposable
                 ct.ThrowIfCancellationRequested();
 
                 var fileNameResults = _fileNameSearch.Search(query, _indexPaths, maxResults: 30);
+                ct.ThrowIfCancellationRequested(); // 文件名搜索后检查取消
+
                 var contentResults = _contentSearcher?.Search(query, maxResults: 20) ?? [];
+                ct.ThrowIfCancellationRequested(); // 内容搜索后检查取消
 
                 // 按配置的后缀过滤内容搜索结果
                 var validExts = new HashSet<string>(_contentExts, StringComparer.OrdinalIgnoreCase);
@@ -378,9 +389,12 @@ public class SearchService : ISearchService, IDisposable
                         merged.Add(r);
                 }
 
+                ct.ThrowIfCancellationRequested(); // 去重后检查取消（防止发布过期结果）
                 return (IReadOnlyList<SearchResult>)merged;
             }, ct);
 
+            // 兜底：Task.Run 完成后再次检查（防止返回值和事件发布之间的竞态）
+            ct.ThrowIfCancellationRequested();
             ResultsUpdated?.Invoke(results);
         }
         catch (OperationCanceledException)

@@ -119,14 +119,20 @@ public partial class MainViewModel : ObservableObject
                 var dispatcher = System.Windows.Application.Current?.Dispatcher;
                 if (dispatcher is not null)
                 {
-                    await dispatcher.InvokeAsync(() =>
+                    // 第1步：优先折叠窗口（快速视觉反馈，不阻塞后续操作）
+                    _ = dispatcher.InvokeAsync(() =>
+                    {
+                        IsExpanded = false;
+                        IsPreviewVisible = false;
+                        HasSearched = false;
+                    }, System.Windows.Threading.DispatcherPriority.Normal);
+
+                    // 第2步：延迟清空结果集合（ListBox 容器销毁可与折叠并行）
+                    _ = dispatcher.InvokeAsync(() =>
                     {
                         Results.Clear();
                         ResultCount = 0;
-                        HasSearched = false;
-                        IsExpanded = false; // 折叠回搜索框
-                        IsPreviewVisible = false;
-                    });
+                    }, System.Windows.Threading.DispatcherPriority.Background);
                 }
                 return;
             }
@@ -174,8 +180,9 @@ public partial class MainViewModel : ObservableObject
     {
         try
         {
-            // 在后台线程执行文件读取，避免同步 IO 阻塞 UI 线程
-            var result = await Task.Run(() => _previewService.GetPreviewAsync(filePath));
+            // 在后台线程执行文件读取和高亮分段预处理，避免 IO 和字符串搜索阻塞 UI 线程
+            var keyword = SearchText;
+            var result = await Task.Run(() => _previewService.GetPreviewAsync(filePath, keyword));
             PreviewContent = result;
             IsPreviewVisible = true;
         }
@@ -198,6 +205,10 @@ public partial class MainViewModel : ObservableObject
 
     private void OnSearchResultsUpdated(IReadOnlyList<Core.Models.SearchResult> results)
     {
+        // 丢弃过期结果：搜索框已被清空，当前不应展示任何旧数据
+        if (string.IsNullOrWhiteSpace(SearchText))
+            return;
+
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
         if (dispatcher is null) return;
 
