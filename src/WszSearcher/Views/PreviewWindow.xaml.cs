@@ -133,7 +133,7 @@ public partial class PreviewWindow : Window
             return;
         }
 
-        // 构建 RichTextBox（默认文本样式）
+        // 构建 RichTextBox（统一深色背景，所有类型一致）
         var rtb = new System.Windows.Controls.RichTextBox
         {
             IsReadOnly = true,
@@ -142,24 +142,20 @@ public partial class PreviewWindow : Window
             FontFamily = new System.Windows.Media.FontFamily("Microsoft YaHei"),
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Background = System.Windows.Media.Brushes.Transparent,
-            Foreground = TryFindResource("TextPrimaryBrush") as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.Black
+            Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1E, 0x1E, 0x1E)),
+            Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD4, 0xD4, 0xD4))
         };
         rtb.Resources.Add(typeof(Paragraph), new Style(typeof(Paragraph)) { Setters = { new Setter(Paragraph.MarginProperty, new Thickness(0)) } });
 
-        // 根据类型设置样式
+        // 根据类型设置差异样式（背景和前景已统一为深色，仅字体和边框有区别）
         switch (content.Type)
         {
             case PreviewType.Code:
-                rtb.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1E, 0x1E, 0x1E));
-                rtb.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD4, 0xD4, 0xD4));
                 rtb.FontFamily = new System.Windows.Media.FontFamily("Cascadia Code, Consolas, Courier New");
                 rtb.FontSize = 12;
                 break;
             case PreviewType.RichText:
-                rtb.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xF8, 0xE1));
-                rtb.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x33, 0x33, 0x33));
-                rtb.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xE0, 0x82));
+                rtb.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x3E, 0x3E, 0x3E));
                 rtb.BorderThickness = new Thickness(1);
                 break;
         }

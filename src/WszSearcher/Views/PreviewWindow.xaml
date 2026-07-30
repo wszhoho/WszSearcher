@@ -7,7 +7,7 @@
         WindowStyle="ToolWindow"
         ResizeMode="CanResize"
         ShowInTaskbar="False"
-        Background="{DynamicResource SurfaceBrush}">
+        Background="#2D2D2D">
 
     <Window.Resources>
         <ResourceDictionary>
