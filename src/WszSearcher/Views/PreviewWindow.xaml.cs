@@ -117,7 +117,6 @@ public partial class PreviewWindow : Window
         var content = vm.PreviewContent;
         if (content is null) return;
         var text = content.Content ?? "";
-        var keyword = vm.SearchText?.Trim();
 
         // 图片类型不渲染文本
         if (content.Type == PreviewType.Image)
@@ -167,36 +166,31 @@ public partial class PreviewWindow : Window
 
         PreviewContentHost.Child = rtb;
 
-        // 高亮搜索词
+        // 高亮搜索词——优先使用后台线程预处理的高亮分段，避免 UI 线程字符串搜索
         var para = new Paragraph();
         _matchIndex = -1;
         _matchCount = 0;
 
-        if (string.IsNullOrEmpty(keyword) || text.Length < keyword.Length)
+        var segments = content.HighlightSegments;
+        if (segments is { Count: > 0 })
         {
-            para.Inlines.Add(new Run(text));
+            // 使用预处理分段构建 Run 元素（后台线程已完成 IndexOf 搜索，UI 线程仅负责创建 UI 元素）
+            foreach (var seg in segments)
+            {
+                var run = new Run(seg.Text);
+                if (seg.IsHighlight)
+                {
+                    run.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xE4, 0xB3));
+                    run.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x1A));
+                    _matchCount++;
+                }
+                para.Inlines.Add(run);
+            }
         }
         else
         {
-            var idx = 0;
-            while (idx < text.Length)
-            {
-                var pos = text.IndexOf(keyword, idx, StringComparison.OrdinalIgnoreCase);
-                if (pos < 0)
-                {
-                    para.Inlines.Add(new Run(text[idx..]));
-                    break;
-                }
-                if (pos > idx)
-                    para.Inlines.Add(new Run(text[idx..pos]));
-                para.Inlines.Add(new Run(text[pos..(pos + keyword.Length)])
-                {
-                    Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xE4, 0xB3)),
-                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1A, 0x1A, 0x1A))
-                });
-                _matchCount++;
-                idx = pos + keyword.Length;
-            }
+            // 无关键词或分段数据，显示纯文本
+            para.Inlines.Add(new Run(text));
         }
 
         rtb.Document.Blocks.Add(para);
