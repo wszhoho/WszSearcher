@@ -7,9 +7,7 @@ namespace WszSearcher.Services;
 /// <summary>应用设置——持久化到 exe 同目录（绿色版，不侵入系统）</summary>
 public class AppSettings
 {
-    private static readonly string SettingsPath = Path.Combine(
-        Path.GetDirectoryName(AppContext.BaseDirectory) ?? ".",
-        "settings.json");
+    private static readonly string SettingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
     private static readonly object _saveLock = new(); // 防止并发写入
 
     // ─── 可持久化属性 ───

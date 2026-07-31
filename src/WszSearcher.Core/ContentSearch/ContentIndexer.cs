@@ -40,9 +40,7 @@ public class ContentIndexer : IDisposable
 
     public ContentIndexer(string? indexPath = null)
     {
-        _indexPath = indexPath ?? Path.Combine(
-            Path.GetDirectoryName(AppContext.BaseDirectory) ?? ".",
-            "Index");
+        _indexPath = indexPath ?? Path.Combine(AppContext.BaseDirectory, "Index");
 
         // 清理上次异常退出残留的写锁
         CleanStaleLock();
@@ -90,6 +88,16 @@ public class ContentIndexer : IDisposable
     public async Task BuildFullIndexAsync(IEnumerable<string> filePaths, CancellationToken ct = default)
     {
         IsReady = false;
+
+        // 提前物化文件列表并检查是否为空，防止 DeleteAll 后无文件可索引
+        var files = filePaths.ToList();
+        if (files.Count == 0)
+        {
+            StatusChanged?.Invoke("内容索引：没有找到需要索引的文件，跳过重建");
+            IsReady = true;
+            return;
+        }
+
         var writer = GetWriter();
 
         writer.DeleteAll();
@@ -98,8 +106,6 @@ public class ContentIndexer : IDisposable
         var handler = StatusChanged;
         handler?.Invoke("正在建立内容索引...");
         var sw = Stopwatch.StartNew();
-
-        var files = filePaths.ToList();
         var count = 0;
         const int reportInterval = 50;
 
