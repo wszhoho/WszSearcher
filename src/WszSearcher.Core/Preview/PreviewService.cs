@@ -135,12 +135,35 @@ public class PreviewService : IPreviewService
         // 去除连续空行（不保留空行）
         text = System.Text.RegularExpressions.Regex.Replace(text, @"\n{2,}", "\n");
 
-        // 限制行数
+        // 限制行数（若关键词在截断区之后，则以关键词行为中心保留窗口，保证高亮可见）
         var lines = text.Split('\n');
         if (lines.Length > MaxPreviewLines)
         {
-            text = string.Join('\n', lines.Take(MaxPreviewLines))
-                 + $"\n\n... (已截断，共 {lines.Length} 行，仅显示前 {MaxPreviewLines} 行)";
+            int keywordLine = -1;
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                keywordLine = Array.FindIndex(lines, l =>
+                    l.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0);
+            }
+
+            if (keywordLine < 0 || keywordLine < MaxPreviewLines)
+            {
+                // 无关键词，或关键词本就在前 MaxPreviewLines 行内——保持原截断逻辑
+                text = string.Join('\n', lines.Take(MaxPreviewLines))
+                     + $"\n\n... (已截断，共 {lines.Length} 行，仅显示前 {MaxPreviewLines} 行)";
+            }
+            else
+            {
+                // 关键词在截断区之后——以关键词行为中心保留 MaxPreviewLines 行窗口
+                int start = keywordLine - MaxPreviewLines / 2;
+                start = Math.Max(0, Math.Min(start, lines.Length - MaxPreviewLines));
+                var window = lines[start..(start + MaxPreviewLines)];
+                var prefix = start > 0 ? $"... (上略 {start} 行)\n" : "";
+                var suffix = start + MaxPreviewLines < lines.Length
+                    ? $"\n\n... (已截断，共 {lines.Length} 行)"
+                    : "";
+                text = prefix + string.Join('\n', window) + suffix;
+            }
         }
 
         return new PreviewResult

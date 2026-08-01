@@ -303,6 +303,21 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>复制完整路径到剪贴板</summary>
+    [RelayCommand]
+    private void CopyFullPath(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return;
+        try
+        {
+            System.Windows.Clipboard.SetText(filePath);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"复制完整路径失败: {ex.Message}");
+        }
+    }
+
     /// <summary>在资源管理器中打开文件所在目录并选中文件</summary>
     [RelayCommand]
     private void OpenFileLocation(string? filePath)

@@ -199,6 +199,9 @@
                                 <MenuItem Header="复制文件名"
                                           Command="{Binding CopyFileNameCommand}"
                                           CommandParameter="{Binding SelectedResult.FullPath}" />
+                                <MenuItem Header="复制完整路径"
+                                          Command="{Binding CopyFullPathCommand}"
+                                          CommandParameter="{Binding SelectedResult.FullPath}" />
                             </ContextMenu>
                         </ListBox.ContextMenu>
                         <ListBox.ItemTemplate>
