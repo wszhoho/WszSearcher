@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using WszSearcher.Core.Native;
 using WszSearcher.Core.Preview;
 using WszSearcher.Core.Search;
 
@@ -17,6 +18,10 @@ public partial class MainViewModel : ObservableObject
     private CancellationTokenSource? _searchCts;
     private readonly object _searchLock = new(); // 保护 _searchCts 竞态
     private System.Timers.Timer? _debounceTimer; // 搜索防抖
+    private System.Timers.Timer? _postSearchRecycleTimer; // 搜索完成后延迟内存回收
+    private System.Timers.Timer? _idleRecycleTimer;       // 周期空闲检测回收
+    private DateTime _lastUserInputTime = DateTime.UtcNow; // 最近一次搜索输入时间
+    private int _recycling;                               // 0=空闲 1=回收中（防重入）
 
     public MainViewModel(ISearchService searchService, IPreviewService previewService)
     {
@@ -30,6 +35,15 @@ public partial class MainViewModel : ObservableObject
         // 初始化防抖定时器（150ms）
         _debounceTimer = new System.Timers.Timer(150) { AutoReset = false };
         _debounceTimer.Elapsed += OnDebounceElapsed;
+
+        // 搜索完成后延迟 10 秒回收内存（给 UI 渲染留出时间）
+        _postSearchRecycleTimer = new System.Timers.Timer(10_000) { AutoReset = false };
+        _postSearchRecycleTimer.Elapsed += (_, _) => RecycleMemory();
+
+        // 周期性空闲回收（每 60 秒检测一次，超过 120 秒无输入则回收）
+        _idleRecycleTimer = new System.Timers.Timer(60_000) { AutoReset = true };
+        _idleRecycleTimer.Elapsed += OnIdleRecycleCheck;
+        _idleRecycleTimer.Start();
     }
 
     // ─── 可观察属性 ───
@@ -89,6 +103,9 @@ public partial class MainViewModel : ObservableObject
     /// <summary>搜索输入变更时触发防抖</summary>
     partial void OnSearchTextChanged(string value)
     {
+        // 记录用户活动时间，并取消待触发的延迟回收（避免与搜索/渲染冲突）
+        _lastUserInputTime = DateTime.UtcNow;
+        _postSearchRecycleTimer?.Stop();
         if (_debounceTimer is null) return;
         _debounceTimer.Stop();
         _debounceTimer.Start();
@@ -223,6 +240,41 @@ public partial class MainViewModel : ObservableObject
             HasSearched = true;
             IsExpanded = true; // 搜索完成后展开窗口显示结果
         });
+
+        // 搜索完成：延迟 10 秒执行内存回收（LOH 压缩 + 工作集释放）
+        _postSearchRecycleTimer?.Stop();
+        _postSearchRecycleTimer?.Start();
+    }
+
+    /// <summary>周期检测空闲状态，长时间无输入则回收内存</summary>
+    private void OnIdleRecycleCheck(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        // 超过 120 秒无搜索输入才回收，避免与用户交互冲突
+        if ((DateTime.UtcNow - _lastUserInputTime).TotalSeconds > 120)
+            RecycleMemory();
+    }
+
+    /// <summary>压缩大对象堆并清空工作集，降低任务管理器内存占用（后台线程执行）</summary>
+    private void RecycleMemory()
+    {
+        if (Interlocked.Exchange(ref _recycling, 1) == 1) return;
+        try
+        {
+            // 下一次阻塞式全量 GC 时压缩大对象堆（LOH），让大数组内存可复用
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode =
+                System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+            // 把空闲物理页换出到页面文件，任务管理器"内存(活动)"列回落
+            MemoryApi.EmptyWorkingSet();
+        }
+        catch
+        {
+            // 内存回收属非关键路径，失败忽略
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _recycling, 0);
+        }
     }
 
     private void OnSearchStatusChanged(SearchStatus status)
@@ -337,6 +389,8 @@ public partial class MainViewModel : ObservableObject
     private void Quit()
     {
         _debounceTimer?.Dispose();
+        _postSearchRecycleTimer?.Dispose();
+        _idleRecycleTimer?.Dispose();
 
         // 通过 App 类触发正确的退出流程（设置 PrepareExit 标志、释放资源）
         if (System.Windows.Application.Current is App app)
