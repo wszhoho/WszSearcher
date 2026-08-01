@@ -8,6 +8,7 @@
 - **毫秒级中文全文搜索** — Lucene.NET 倒排索引 + jieba 中文分词 + ToolGood.Words 拼音
 - **拼音模糊搜索** — 支持拼音首字母（`wj` → `文件`）和全拼（`wenjian` → `文件`）
 - **多盘多目录** — 支持跨盘符多目录索引
+- **极低的内存占用** — 搜索完成后立刻释放内存占用，常态化内存占用约6-30MB
 - **全局热键** — 默认 `Alt+Space` 呼出/隐藏，支持自定义快捷键及冲突检测
 - **浮动预览** — 选中结果弹出预览窗口，吸附主窗口右侧、支持拖离拖回
 - **预览高亮** — 搜索词黄色高亮，▲▼按钮导航匹配位置，一键复制全文
@@ -20,6 +21,7 @@
 
 <img width="651" height="324" alt="1" src="https://github.com/user-attachments/assets/7f64ad09-0be2-4da6-9d59-37bf9965f64e" />
 <img width="918" height="456" alt="3" src="https://github.com/user-attachments/assets/0a7a74eb-ee5d-445c-be6b-7a7f4c46987c" />
+<img width="619" height="71" alt="1" src="https://github.com/user-attachments/assets/8de6c14a-ffb1-464f-abca-ea47e9f3bf6f" />
 ## 技术栈
 
 | 组件 | 用途 |
