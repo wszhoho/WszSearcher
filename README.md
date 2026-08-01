@@ -18,9 +18,8 @@
 - **单实例保护** — 只允许一个进程运行
 - **便携绿色** — 所有设置存储在 exe 同级目录，不写入系统目录
 
-
-<img width="651" height="324" alt="1" src="https://github.com/user-attachments/assets/7f64ad09-0be2-4da6-9d59-37bf9965f64e" />
-<img width="918" height="456" alt="3" src="https://github.com/user-attachments/assets/0a7a74eb-ee5d-445c-be6b-7a7f4c46987c" />
+<img width="651" height="324" alt="1" src="https://github.com/user-attachments/assets/e9a648ba-e616-4356-90c7-8dcb9be6478d" />
+<img width="918" height="456" alt="2" src="https://github.com/user-attachments/assets/566d1535-703e-4334-9d6c-5a7f34dcc875" />
 <img width="619" height="71" alt="1" src="https://github.com/user-attachments/assets/8de6c14a-ffb1-464f-abca-ea47e9f3bf6f" />
 
 
