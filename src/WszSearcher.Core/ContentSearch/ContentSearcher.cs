@@ -57,9 +57,10 @@ public class ContentSearcher : IDisposable
             // 转义特殊字符
             var escapedQuery = QueryParser.Escape(query);
 
-            // 执行搜索
+            // 执行搜索（不带 Sort：默认按相关度降序，且 ScoreDoc.score 有效填充；
+            // 带 Sort 的重载在 Lucene.NET 3.0.3 中 score 为 NaN，导致相关度显示为 0）
             var luceneQuery = queryParser.Parse(escapedQuery);
-            var hits = searcher.Search(luceneQuery, null, maxResults, Sort.RELEVANCE);
+            var hits = searcher.Search(luceneQuery, null, maxResults);
 
             foreach (var hit in hits.ScoreDocs)
             {
