@@ -17,6 +17,9 @@ public interface ISearchService
     /// <summary>索引进度（已处理文件数）</summary>
     event Action<int>? ProgressChanged;
 
+    /// <summary>实时索引更新完成事件（文件增删改同步到索引后触发，UI 用于自动刷新结果）</summary>
+    event Action? IndexUpdated;
+
     /// <summary>异步搜索</summary>
     Task SearchAsync(string query, CancellationToken ct = default);
 

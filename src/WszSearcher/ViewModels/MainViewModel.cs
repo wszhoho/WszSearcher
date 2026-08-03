@@ -18,6 +18,7 @@ public partial class MainViewModel : ObservableObject
     private CancellationTokenSource? _searchCts;
     private readonly object _searchLock = new(); // 保护 _searchCts 竞态
     private System.Timers.Timer? _debounceTimer; // 搜索防抖
+    private System.Timers.Timer? _indexRefreshTimer; // 索引实时更新后自动刷新结果防抖
     private System.Timers.Timer? _postSearchRecycleTimer; // 搜索完成后延迟内存回收
     private System.Timers.Timer? _idleRecycleTimer;       // 周期空闲检测回收
     private DateTime _lastUserInputTime = DateTime.UtcNow; // 最近一次搜索输入时间
@@ -31,10 +32,15 @@ public partial class MainViewModel : ObservableObject
         _searchService.StatusChanged += OnSearchStatusChanged;
         _searchService.StatusMessage += msg => StatusMessage = msg;
         _searchService.ProgressChanged += count => IndexProgress = count;
+        _searchService.IndexUpdated += OnIndexUpdated;
 
         // 初始化防抖定时器（150ms）
         _debounceTimer = new System.Timers.Timer(150) { AutoReset = false };
         _debounceTimer.Elapsed += OnDebounceElapsed;
+
+        // 索引实时更新后自动刷新当前搜索结果（800ms 合并批量文件变更）
+        _indexRefreshTimer = new System.Timers.Timer(800) { AutoReset = false };
+        _indexRefreshTimer.Elapsed += OnIndexRefreshElapsed;
 
         // 搜索完成后延迟 10 秒回收内存（给 UI 渲染留出时间）
         _postSearchRecycleTimer = new System.Timers.Timer(10_000) { AutoReset = false };
@@ -117,17 +123,7 @@ public partial class MainViewModel : ObservableObject
         try
         {
             // 原子地取消旧搜索并创建新令牌
-            CancellationTokenSource? oldCts;
-            CancellationTokenSource newCts;
-            lock (_searchLock)
-            {
-                oldCts = _searchCts;
-                _searchCts = new CancellationTokenSource();
-                newCts = _searchCts;
-            }
-            // 在锁外 Cancel/Dispose，防止回调中获取锁导致死锁
-            oldCts?.Cancel();
-            oldCts?.Dispose();
+            var newCts = CreateSearchToken();
 
             // 在 UI 线程读取搜索文本（避免跨线程访问属性）
             var query = SearchText;
@@ -154,19 +150,66 @@ public partial class MainViewModel : ObservableObject
                 return;
             }
 
-            try
-            {
-                await _searchService.SearchAsync(query, newCts.Token);
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"搜索异常: {ex.Message}");
-            }
+            await ExecuteSearchAsync(newCts);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"防抖定时器异常: {ex.Message}");
+        }
+    }
+
+    /// <summary>索引实时更新完成：若有激活搜索词，排队自动刷新当前搜索结果</summary>
+    private void OnIndexUpdated()
+    {
+        if (string.IsNullOrWhiteSpace(SearchText)) return;
+        _indexRefreshTimer?.Stop();
+        _indexRefreshTimer?.Start();
+    }
+
+    /// <summary>索引刷新防抖到期，重新执行当前搜索（不折叠窗口、不清空结果）</summary>
+    private async void OnIndexRefreshElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        try
+        {
+            await ExecuteSearchAsync(CreateSearchToken());
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"索引刷新搜索异常: {ex.Message}");
+        }
+    }
+
+    /// <summary>原子地取消旧搜索并创建新令牌（锁外取消，防止回调中获取锁导致死锁）</summary>
+    private CancellationTokenSource CreateSearchToken()
+    {
+        CancellationTokenSource? oldCts;
+        CancellationTokenSource newCts;
+        lock (_searchLock)
+        {
+            oldCts = _searchCts;
+            _searchCts = new CancellationTokenSource();
+            newCts = _searchCts;
+        }
+        // 在锁外 Cancel/Dispose，防止回调中获取锁导致死锁
+        oldCts?.Cancel();
+        oldCts?.Dispose();
+        return newCts;
+    }
+
+    /// <summary>执行搜索（输入防抖与索引自动刷新共用）</summary>
+    private async Task ExecuteSearchAsync(CancellationTokenSource cts)
+    {
+        var query = SearchText;
+        if (string.IsNullOrWhiteSpace(query)) return;
+
+        try
+        {
+            await _searchService.SearchAsync(query, cts.Token);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"搜索异常: {ex.Message}");
         }
     }
 

@@ -152,8 +152,14 @@ public class ContentIndexer : IDisposable
         ct.ThrowIfCancellationRequested();
         try
         {
+            // 防复活：文件已不存在则跳过（删除事件与排队索引任务竞态时，避免把已删文件写回索引）
+            if (!File.Exists(filePath)) return;
+
             var text = _parsers.ExtractTextAsync(filePath, ct).GetAwaiter().GetResult();
             if (string.IsNullOrWhiteSpace(text)) return;
+
+            // 提取耗时较长（大文件可达数十秒），完成后再次校验，防止期间被删除的文件被写回索引
+            if (!File.Exists(filePath)) return;
 
             var doc = new Document();
             doc.Add(new Field("path", filePath, Field.Store.YES, Field.Index.NOT_ANALYZED));
@@ -255,6 +261,26 @@ public class ContentIndexer : IDisposable
     public void SyncDocCount()
     {
         DocCount = TryGetDocCount();
+    }
+
+    /// <summary>读取索引中所有已索引的完整路径集合（启动补齐缺失文档用，大小写不敏感）</summary>
+    public HashSet<string> GetIndexedPaths()
+    {
+        try
+        {
+            if (!IndexReader.IndexExists(_directory)) return [];
+            using var reader = IndexReader.Open(_directory, true);
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < reader.MaxDoc; i++)
+            {
+                if (reader.IsDeleted(i)) continue; // 跳过已标记删除的文档
+                var doc = reader.Document(i);
+                var p = doc.Get("path");
+                if (!string.IsNullOrEmpty(p)) paths.Add(p);
+            }
+            return paths;
+        }
+        catch { return []; }
     }
 
     /// <summary>提交增量变更（增量索引后调用）</summary>

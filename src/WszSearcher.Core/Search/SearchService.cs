@@ -17,7 +17,7 @@ public class SearchService : ISearchService, IDisposable
     private readonly ContentSearcher _contentSearcher;
     private List<string> _indexPaths = [];
     private List<string> _contentExts = [];
-    private FileSystemWatcher? _contentWatcher;
+    private readonly List<FileSystemWatcher> _contentWatchers = []; // 每个索引路径一个 watcher（FSW 只能监听一个根）
     private CancellationTokenSource? _buildCts; // 索引构建取消令牌
     private bool _disposed;
 
@@ -38,6 +38,7 @@ public class SearchService : ISearchService, IDisposable
     public event Action<SearchStatus>? StatusChanged;
     public event Action<string>? StatusMessage;
     public event Action<int>? ProgressChanged;
+    public event Action? IndexUpdated; // 实时索引更新完成后触发（供 UI 自动刷新结果）
 
     public SearchStatus Status { get; private set; } = SearchStatus.Idle;
 
@@ -56,6 +57,7 @@ public class SearchService : ISearchService, IDisposable
             _fileNameSearch.SetFallbackPaths(paths);
         }
         CancelBuild(); // 增删目录时取消正在进行的索引
+        _backfillCts?.Cancel(); // 路径变更后取消后台补齐（补齐基于旧路径，路径变了无意义）
     }
 
     private void CancelBuild()
@@ -74,6 +76,7 @@ public class SearchService : ISearchService, IDisposable
     public void CancelIndex()
     {
         CancelBuild();
+        _backfillCts?.Cancel(); // 取消后台补齐
         _fileNameSearch.CancelScan();
         // 立即归零内容索引计数
         _contentIndexer.DocCount = 0;
@@ -120,6 +123,68 @@ public class SearchService : ISearchService, IDisposable
 
         Status = SearchStatus.Ready;
         StatusChanged?.Invoke(Status);
+
+        // 启动内容 watcher 恢复实时更新 + 后台补齐缺失索引（索引存在时才有意义，否则等用户手动重建）
+        if (_contentIndexer.IndexExists())
+        {
+            StartContentWatcher();
+            _ = BackfillMissingAsync();
+        }
+    }
+
+    /// <summary>
+    /// 启动后后台补齐缺失的内容索引：对比磁盘文件与索引已有文档，只索引缺失部分。
+    /// 解决历史文件在 watcher 未启动期间未被索引、只能重建才能搜到的问题；保留现有索引，不打断搜索
+    /// </summary>
+    private async Task BackfillMissingAsync()
+    {
+        if (_rebuilding || _backfillCts is not null) return; // 防重入
+        _backfillCts = new CancellationTokenSource();
+        var ct = _backfillCts.Token;
+        try
+        {
+            // 1. 索引中已有的路径集合
+            var indexed = _contentIndexer.GetIndexedPaths();
+            ct.ThrowIfCancellationRequested();
+
+            // 2. 枚举磁盘并求差集（磁盘有、索引无）
+            var missing = new List<string>();
+            foreach (var f in EnumerateFilesFromPaths(_indexPaths))
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!indexed.Contains(f)) missing.Add(f);
+            }
+
+            if (missing.Count == 0)
+            {
+                StatusMessage?.Invoke("内容索引已完整，无需补齐");
+                return;
+            }
+
+            // 3. 逐文件补齐（IndexFileInternal 内含 File.Exists 防复活校验）
+            StatusMessage?.Invoke($"正在补齐缺失的内容索引（{missing.Count} 个文件）...");
+            foreach (var f in missing)
+            {
+                ct.ThrowIfCancellationRequested();
+                await _contentIndexer.IndexFileAsync(f, ct);
+            }
+            _contentIndexer.CommitChanges();
+            StatusMessage?.Invoke($"内容索引补齐完成：新增 {missing.Count} 个文档");
+            IndexUpdated?.Invoke(); // 通知 UI 刷新当前搜索结果
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage?.Invoke("内容索引补齐已取消");
+        }
+        catch (Exception ex)
+        {
+            Log($"内容索引补齐失败: {ex.Message}");
+        }
+        finally
+        {
+            _backfillCts?.Dispose();
+            _backfillCts = null;
+        }
     }
 
     /// <summary>
@@ -174,6 +239,7 @@ public class SearchService : ISearchService, IDisposable
     }
 
     private bool _rebuilding;
+    private CancellationTokenSource? _backfillCts; // 启动补齐缺失索引的取消令牌
     private readonly ConcurrentDictionary<string, DateTime> _recentFiles = new();
 
     private static void Log(string msg) => AppLog.Info("content", msg);
@@ -183,6 +249,7 @@ public class SearchService : ISearchService, IDisposable
     {
         _rebuilding = true;
         StopContentWatcher();
+        _backfillCts?.Cancel(); // 取消后台补齐（重建会全量索引，无需补齐）
         CancelBuild();
         _buildCts = new CancellationTokenSource();
         var ct = _buildCts.Token;
@@ -253,33 +320,28 @@ public class SearchService : ISearchService, IDisposable
     private void StartContentWatcher()
     {
         if (_indexPaths.Count == 0 || _contentExts.Count == 0) return;
+        StopContentWatcher();
         try
         {
-            _contentWatcher?.Dispose();
-            _contentWatcher = new FileSystemWatcher
-            {
-                IncludeSubdirectories = true,
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
-                InternalBufferSize = 32768
-            };
-            _contentWatcher.Created += OnContentFileChanged;
-            _contentWatcher.Changed += OnContentFileChanged;
-            _contentWatcher.Deleted += OnContentFileDeleted;
-            _contentWatcher.Renamed += OnContentFileRenamed;
-            _contentWatcher.Error += (_, e) => Debug.WriteLine($"内容索引监听异常: {e.GetException()?.Message}");
-
-            // 监听所有索引路径
+            // 每个索引路径各建一个 watcher（FileSystemWatcher 只能监听一个根目录）
             foreach (var path in _indexPaths)
             {
-                if (System.IO.Directory.Exists(path))
-                    _contentWatcher.Path = path; // FSW 只能监听一个根，这里需要为每个路径创建...
-            }
-            // 监听第一个索引路径
-            if (_indexPaths.Count > 0 && System.IO.Directory.Exists(_indexPaths[0]))
-            {
-                _contentWatcher.Path = _indexPaths[0];
-                _contentWatcher.EnableRaisingEvents = true;
-                Log($"[ContentWatcher] 已启动: {_indexPaths[0]}");
+                if (!System.IO.Directory.Exists(path)) continue;
+                var watcher = new FileSystemWatcher
+                {
+                    Path = path,
+                    IncludeSubdirectories = true,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
+                    InternalBufferSize = 32768
+                };
+                watcher.Created += OnContentFileChanged;
+                watcher.Changed += OnContentFileChanged;
+                watcher.Deleted += OnContentFileDeleted;
+                watcher.Renamed += OnContentFileRenamed;
+                watcher.Error += (_, e) => Debug.WriteLine($"内容索引监听异常: {e.GetException()?.Message}");
+                watcher.EnableRaisingEvents = true;
+                _contentWatchers.Add(watcher);
+                Log($"[ContentWatcher] 已启动: {path}");
             }
         }
         catch (Exception ex)
@@ -290,8 +352,12 @@ public class SearchService : ISearchService, IDisposable
 
     private void StopContentWatcher()
     {
-        _contentWatcher?.Dispose();
-        _contentWatcher = null;
+        foreach (var watcher in _contentWatchers)
+        {
+            watcher.EnableRaisingEvents = false;
+            watcher.Dispose();
+        }
+        _contentWatchers.Clear();
     }
 
     private async void OnContentFileChanged(object sender, FileSystemEventArgs e)
@@ -309,12 +375,38 @@ public class SearchService : ISearchService, IDisposable
         Log($"[ContentWatcher] 索引: {Path.GetFileName(e.FullPath)}");
         try
         {
-            await Task.Delay(200);
+            // 等待文件写入完成（大文件粘贴时避免索引到半截内容）；文件被删除则直接放弃
+            await WaitForFileStable(e.FullPath);
             await _contentIndexer.IndexFileAsync(e.FullPath);
             _contentIndexer.CommitChanges();
             Log($"增量索引完成: {Path.GetFileName(e.FullPath)}, 文件名={_fileNameSearch.IndexCount}, 内容={_contentIndexer.DocCount}");
+            IndexUpdated?.Invoke(); // 通知 UI 刷新当前搜索结果
         }
         catch (Exception ex) { Log($"增量索引失败: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// 等待文件大小稳定（写入完成）：两次采样间隔内大小不再变化视为稳定，最长等待 timeoutMs。
+    /// 文件被删除或读取失败时提前返回，交给后续事件或防复活逻辑处理
+    /// </summary>
+    private static async Task WaitForFileStable(string path, int timeoutMs = 15_000)
+    {
+        var sw = Stopwatch.StartNew();
+        long lastLen = -1;
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            if (!File.Exists(path)) return; // 文件已被删除，放弃索引
+            long len;
+            try { len = new FileInfo(path).Length; }
+            catch { return; } // 被其他进程独占读取失败，交给后续 Changed 事件重试
+            if (len == lastLen)
+            {
+                await Task.Delay(300); // 大小稳定后再等 300ms 确认写入收尾
+                return;
+            }
+            lastLen = len;
+            await Task.Delay(300);
+        }
     }
 
     private void OnContentFileDeleted(object sender, FileSystemEventArgs e)
@@ -325,11 +417,12 @@ public class SearchService : ISearchService, IDisposable
         {
             _contentIndexer.RemoveFile(e.FullPath);
             Log($"删除索引完成: {Path.GetFileName(e.FullPath)}, 内容={_contentIndexer.DocCount}");
+            IndexUpdated?.Invoke(); // 通知 UI 刷新当前搜索结果
         }
         catch (Exception ex) { Log($"删除索引失败: {ex.Message}"); }
     }
 
-    private void OnContentFileRenamed(object sender, RenamedEventArgs e)
+    private async void OnContentFileRenamed(object sender, RenamedEventArgs e)
     {
         if (_rebuilding) return;
         try
@@ -337,7 +430,12 @@ public class SearchService : ISearchService, IDisposable
             _contentIndexer.RemoveFile(e.OldFullPath);
             var ext = Path.GetExtension(e.FullPath).TrimStart('.').ToLowerInvariant();
             if (_contentExts.Contains(ext, StringComparer.OrdinalIgnoreCase))
-                _ = _contentIndexer.IndexFileAsync(e.FullPath);
+            {
+                // 新路径走完整增量流程并提交，避免 fire-and-forget 导致新文档不可见
+                await _contentIndexer.IndexFileAsync(e.FullPath);
+                _contentIndexer.CommitChanges();
+            }
+            IndexUpdated?.Invoke(); // 通知 UI 刷新当前搜索结果
         }
         catch (Exception ex) { Debug.WriteLine($"重命名索引失败: {ex.Message}"); }
     }
@@ -374,18 +472,18 @@ public class SearchService : ISearchService, IDisposable
                         Path.GetExtension(r.FullPath).TrimStart('.')))
                     .ToList();
 
-                // HashSet 去重
+                // HashSet 去重 + 过滤磁盘上已不存在的文件（索引脏数据兜底，结果 ≤50 开销可忽略）
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var merged = new List<SearchResult>();
 
                 foreach (var r in fileNameResults)
                 {
-                    if (seen.Add(r.FullPath))
+                    if (seen.Add(r.FullPath) && File.Exists(r.FullPath))
                         merged.Add(r);
                 }
                 foreach (var r in contentResults)
                 {
-                    if (seen.Add(r.FullPath))
+                    if (seen.Add(r.FullPath) && File.Exists(r.FullPath))
                         merged.Add(r);
                 }
 
