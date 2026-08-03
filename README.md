@@ -91,7 +91,7 @@ src/
 
 ### 文件名搜索（USN Journal）
 
-1. 通过 `CreateFile("\\\\.\\C:")` 打开卷设备
+1. 通过 `CreateFile("\\\\.\\卷标:")` 打开卷设备
 2. 使用 `DeviceIoControl(FSCTL_ENUM_USN_DATA)` 枚举 MFT 中所有文件的 USN 记录
 3. 解析 `USN_RECORD_V2` 结构体，通过父 FRN 递归还原完整路径
 4. 跨盘扫描时分别打开各卷合并结果
