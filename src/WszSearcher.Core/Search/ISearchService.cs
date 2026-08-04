@@ -41,6 +41,9 @@ public interface ISearchService
     /// <summary>设置内容索引文件后缀</summary>
     void SetContentExtensions(List<string> extensions);
 
+    /// <summary>设置排除目录模式（*\node_modules 等），扫描与 watcher 事件过滤共用</summary>
+    void SetExcludePaths(List<string> patterns);
+
     /// <summary>当前搜索状态</summary>
     SearchStatus Status { get; }
 

@@ -276,6 +276,9 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         // 设置全文索引后缀
         _searchService.SetContentExtensions(_settings.ContentIndexExtensions);
 
+        // 设置排除目录（扫描与 watcher 事件过滤共用）
+        _searchService.SetExcludePaths(_settings.ExcludePaths);
+
         // 立即清零显示
         FileNameCount = "0";
         ContentCount = "0";

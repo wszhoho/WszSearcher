@@ -71,6 +71,7 @@ namespace WszSearcher;
         _ = FindResource("TrayIcon");
 
         searchService.SetContentExtensions(_settings.ContentIndexExtensions);
+        searchService.SetExcludePaths(_settings.ExcludePaths);
 
         // 设置索引路径并快速初始化（仅文件名扫描+磁盘内容恢复，不触发慢速重建）
         if (_settings.IndexPaths.Count > 0)

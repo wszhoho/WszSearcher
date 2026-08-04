@@ -17,9 +17,19 @@ public class SearchService : ISearchService, IDisposable
     private readonly ContentSearcher _contentSearcher;
     private List<string> _indexPaths = [];
     private List<string> _contentExts = [];
+    private List<string> _excludePatterns = []; // 用户排除目录模式（*\node_modules 等），watcher 事件过滤用
     private readonly List<FileSystemWatcher> _contentWatchers = []; // 每个索引路径一个 watcher（FSW 只能监听一个根）
     private CancellationTokenSource? _buildCts; // 索引构建取消令牌
+    private long _lastWatcherRebuildTicks; // watcher 重建节流时间戳（防事件风暴下无限重建）
     private bool _disposed;
+
+    // 目录黑名单：扫描与 watcher 事件过滤共用，命中即不索引（避免 C 盘全盘事件风暴）
+    private static readonly HashSet<string> SkipDirNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "node_modules", ".git", "bin", "obj", "packages",
+        "vendor", "__pycache__", "target", "build", "dist",
+        "bower_components", ".vs", ".vscode", ".idea"
+    };
 
     public SearchService(char driveLetter = 'C')
     {
@@ -87,6 +97,37 @@ public class SearchService : ISearchService, IDisposable
     {
         _contentExts = extensions ?? [];
         _fileNameSearch.SetExtensionFilter(_contentExts);
+    }
+
+    /// <summary>设置排除目录模式（*\node_modules 等），watcher 事件与扫描共用过滤</summary>
+    public void SetExcludePaths(List<string> patterns)
+    {
+        _excludePatterns = patterns ?? [];
+    }
+
+    /// <summary>
+    /// watcher 事件统一过滤：命中黑名单/排除目录、无索引后缀、点开头目录 → false。
+    /// 必须在进入索引流程前调用，避免 C 盘全盘事件风暴拖垮软件
+    /// </summary>
+    private bool IsIndexablePath(string path)
+    {
+        // 1. 后缀过滤（目录无后缀自然被排除）
+        var ext = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+        if (!_contentExts.Contains(ext, StringComparer.OrdinalIgnoreCase)) return false;
+
+        // 2. 路径逐段过滤：点开头目录（.git/.vscode）、黑名单目录、用户 ExcludePaths 模式
+        var segments = path.Split(Path.DirectorySeparatorChar);
+        foreach (var seg in segments)
+        {
+            if (seg.Length > 0 && seg[0] == '.') return false;
+            if (SkipDirNames.Contains(seg)) return false;
+            foreach (var pat in _excludePatterns)
+            {
+                var name = pat.Trim('*', '\\', '/'); // "*\node_modules" → "node_modules"
+                if (name.Length > 0 && name.Equals(seg, StringComparison.OrdinalIgnoreCase)) return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>文件名索引文件总数</summary>
@@ -331,14 +372,15 @@ public class SearchService : ISearchService, IDisposable
                 {
                     Path = path,
                     IncludeSubdirectories = true,
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size | NotifyFilters.LastWrite,
-                    InternalBufferSize = 32768
+                    // 去掉 Size：LastWrite 已能感知内容变更，Size 会让写入中的大文件高频触发
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+                    InternalBufferSize = 64 * 1024 // FSW 上限，降低高并发事件下缓冲溢出概率
                 };
                 watcher.Created += OnContentFileChanged;
                 watcher.Changed += OnContentFileChanged;
                 watcher.Deleted += OnContentFileDeleted;
                 watcher.Renamed += OnContentFileRenamed;
-                watcher.Error += (_, e) => Debug.WriteLine($"内容索引监听异常: {e.GetException()?.Message}");
+                watcher.Error += (_, _) => RebuildContentWatcher(path); // 缓冲溢出后自动重建，防静默失效
                 watcher.EnableRaisingEvents = true;
                 _contentWatchers.Add(watcher);
                 Log($"[ContentWatcher] 已启动: {path}");
@@ -360,16 +402,38 @@ public class SearchService : ISearchService, IDisposable
         _contentWatchers.Clear();
     }
 
+    /// <summary>watcher 缓冲溢出/异常后自动重建监听，5 秒节流防止事件风暴下无限重建</summary>
+    private void RebuildContentWatcher(string path)
+    {
+        var now = DateTime.UtcNow.Ticks;
+        var last = Interlocked.Read(ref _lastWatcherRebuildTicks);
+        if (now - last < TimeSpan.FromSeconds(5).Ticks) return;
+        Interlocked.Exchange(ref _lastWatcherRebuildTicks, now);
+        Log($"[ContentWatcher] 监听异常，自动重建: {path}");
+        _ = Task.Run(() =>
+        {
+            if (_rebuilding) return;
+            try { StopContentWatcher(); StartContentWatcher(); }
+            catch (Exception ex) { Debug.WriteLine($"内容索引监听重建失败: {ex.Message}"); }
+        });
+    }
+
     private async void OnContentFileChanged(object sender, FileSystemEventArgs e)
     {
         if (_rebuilding) return;
-        var ext = Path.GetExtension(e.FullPath).TrimStart('.').ToLowerInvariant();
-        if (!_contentExts.Contains(ext, StringComparer.OrdinalIgnoreCase)) return;
+        // 统一过滤：黑名单/排除目录、无索引后缀、点开头目录直接丢弃（事件已触发，但不再进索引流程）
+        if (!IsIndexablePath(e.FullPath)) return;
 
         // 防抖：同一文件 3 秒内只索引一次
         var now = DateTime.UtcNow;
         if (_recentFiles.TryGetValue(e.FullPath, out var last) && (now - last).TotalSeconds < 3)
             return;
+        // 防抖字典上限清理：超过 2 万条时剔除 3 秒前的旧条目，防 C 盘高频事件下内存膨胀
+        if (_recentFiles.Count > 20_000)
+        {
+            var stale = _recentFiles.Where(kv => (now - kv.Value).TotalSeconds > 3).Select(kv => kv.Key).ToList();
+            foreach (var key in stale) _recentFiles.TryRemove(key, out _);
+        }
         _recentFiles[e.FullPath] = now;
 
         Log($"[ContentWatcher] 索引: {Path.GetFileName(e.FullPath)}");
@@ -412,6 +476,8 @@ public class SearchService : ISearchService, IDisposable
     private void OnContentFileDeleted(object sender, FileSystemEventArgs e)
     {
         if (_rebuilding) return;
+        // 删除目录也触发 Deleted 事件：目录无后缀/命中排除目录时跳过，避免无效 RemoveFile
+        if (!IsIndexablePath(e.FullPath)) return;
         Log($"[ContentWatcher] 删除: {Path.GetFileName(e.FullPath)}");
         try
         {
@@ -427,11 +493,12 @@ public class SearchService : ISearchService, IDisposable
         if (_rebuilding) return;
         try
         {
-            _contentIndexer.RemoveFile(e.OldFullPath);
-            var ext = Path.GetExtension(e.FullPath).TrimStart('.').ToLowerInvariant();
-            if (_contentExts.Contains(ext, StringComparer.OrdinalIgnoreCase))
+            // 旧路径：曾可索引才删除（精确 term 删除，无匹配则无害）
+            if (IsIndexablePath(e.OldFullPath))
+                _contentIndexer.RemoveFile(e.OldFullPath);
+            // 新路径：通过统一过滤才走完整增量流程，避免 fire-and-forget 导致新文档不可见
+            if (IsIndexablePath(e.FullPath))
             {
-                // 新路径走完整增量流程并提交，避免 fire-and-forget 导致新文档不可见
                 await _contentIndexer.IndexFileAsync(e.FullPath);
                 _contentIndexer.CommitChanges();
             }
@@ -544,10 +611,7 @@ public class SearchService : ISearchService, IDisposable
             {
                 var dirName = System.IO.Path.GetFileName(subDir);
                 if (dirName.Length > 0 && dirName[0] == '.') continue;
-                if (dirName is "node_modules" or ".git" or "bin" or "obj" or "packages"
-                    or "vendor" or "__pycache__" or "target" or "build" or "dist"
-                    or "bower_components" or ".vs" or ".vscode" or ".idea")
-                    continue;
+                if (SkipDirNames.Contains(dirName)) continue; // 与 watcher 事件过滤共用同一黑名单
                 dirs.Enqueue(subDir);
             }
 
