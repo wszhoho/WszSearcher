@@ -391,7 +391,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
                     FileName = "schtasks",
                     Arguments = $"/Create /F /SC ONLOGON /TN \"WszSearcher\" /TR \"\\\"{exe}\\\"\" /RL HIGHEST",
                     UseShellExecute = true,
-                    Verb = "runas"
+                    Verb = "runas",
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden // 隐藏 schtasks 控制台窗口
                 };
                 System.Diagnostics.Process.Start(psi)?.WaitForExit(5000);
             }
@@ -402,7 +403,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
                     FileName = "schtasks",
                     Arguments = "/Delete /F /TN \"WszSearcher\"",
                     UseShellExecute = true,
-                    Verb = "runas"
+                    Verb = "runas",
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden // 隐藏 schtasks 控制台窗口
                 };
                 System.Diagnostics.Process.Start(psi)?.WaitForExit(5000);
             }

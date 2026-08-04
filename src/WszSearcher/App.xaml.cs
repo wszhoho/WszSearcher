@@ -107,7 +107,8 @@ namespace WszSearcher;
                 FileName = "schtasks",
                 Arguments = $"/Create /F /SC ONLOGON /TN \"WszSearcher\" /TR \"\\\"{exe}\\\"\" /RL HIGHEST",
                 UseShellExecute = true,
-                Verb = "runas"
+                Verb = "runas",
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden // 隐藏 schtasks 控制台窗口，避免开机时黑色终端闪现
             })?.WaitForExit(5000);
         }
         catch { }
@@ -123,7 +124,8 @@ namespace WszSearcher;
                 FileName = "schtasks",
                 Arguments = "/Delete /F /TN \"WszSearcher\"",
                 UseShellExecute = true,
-                Verb = "runas"
+                Verb = "runas",
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden // 隐藏 schtasks 控制台窗口
             })?.WaitForExit(5000);
         }
         catch { }
