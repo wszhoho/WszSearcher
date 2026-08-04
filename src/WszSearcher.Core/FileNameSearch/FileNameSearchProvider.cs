@@ -35,6 +35,7 @@ public class FileNameSearchProvider : IDisposable
     private CancellationTokenSource? _scanCts; // 扫描取消令牌
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _recentFiles = new();
     private HashSet<string> _extFilter = []; // 文件名后缀过滤
+    private List<string> _excludePatterns = []; // 用户排除目录模式（*\node_modules 等），扫描与 watcher 共用
 
     /// <summary>索引状态变更事件</summary>
     public event Action<IndexState>? StateChanged;
@@ -54,6 +55,12 @@ public class FileNameSearchProvider : IDisposable
         _extFilter = extensions.Count > 0
             ? new HashSet<string>(extensions.Select(e => $".{e.TrimStart('.')}"), StringComparer.OrdinalIgnoreCase)
             : [];
+    }
+
+    /// <summary>设置排除目录模式（*\node_modules 等），扫描与 watcher 事件共用过滤</summary>
+    public void SetExcludePaths(List<string> patterns)
+    {
+        _excludePatterns = patterns ?? [];
     }
 
     /// <summary>当前索引文件总数</summary>
@@ -113,7 +120,10 @@ public class FileNameSearchProvider : IDisposable
 
         try
         {
-            var filtered = _extFilter.Count == 0 ? allFiles : allFiles.Where(f => PassExtFilter(f.FullPath)).ToList();
+            // 后缀过滤 + 排除目录过滤（黑名单/点开头/用户 ExcludePaths，与内容索引共用规则）
+            var filtered = allFiles.Where(f =>
+                (_extFilter.Count == 0 || PassExtFilter(f.FullPath)) &&
+                !PathFilter.IsExcluded(f.FullPath, _excludePatterns)).ToList();
             _index.AddRange(filtered);
 
             // 启动文件变更监听
@@ -343,8 +353,8 @@ public class FileNameSearchProvider : IDisposable
         return true;
     }
 
-    /// <summary>是否应被文件名索引忽略</summary>
-    private static bool ShouldIgnore(string path)
+    /// <summary>是否应被文件名索引忽略（临时文件 / 排除目录 / Lucene 索引自身文件）</summary>
+    private bool ShouldIgnore(string path)
     {
         var name = System.IO.Path.GetFileName(path);
         if (name.Length == 0) return true;
@@ -353,6 +363,8 @@ public class FileNameSearchProvider : IDisposable
         if (path.Contains("\\Index\\", StringComparison.OrdinalIgnoreCase) &&
             (name.StartsWith('_') || name.StartsWith("segments") || name == "write.lock"))
             return true;
+        // 黑名单/点开头/用户 ExcludePaths 目录：与内容索引共用同一过滤规则
+        if (PathFilter.IsExcluded(path, _excludePatterns)) return true;
         return false;
     }
 

@@ -23,14 +23,6 @@ public class SearchService : ISearchService, IDisposable
     private long _lastWatcherRebuildTicks; // watcher 重建节流时间戳（防事件风暴下无限重建）
     private bool _disposed;
 
-    // 目录黑名单：扫描与 watcher 事件过滤共用，命中即不索引（避免 C 盘全盘事件风暴）
-    private static readonly HashSet<string> SkipDirNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "node_modules", ".git", "bin", "obj", "packages",
-        "vendor", "__pycache__", "target", "build", "dist",
-        "bower_components", ".vs", ".vscode", ".idea"
-    };
-
     public SearchService(char driveLetter = 'C')
     {
         _fileNameSearch = new FileNameSearchProvider(driveLetter);
@@ -103,6 +95,7 @@ public class SearchService : ISearchService, IDisposable
     public void SetExcludePaths(List<string> patterns)
     {
         _excludePatterns = patterns ?? [];
+        _fileNameSearch.SetExcludePaths(_excludePatterns); // 文件名搜索同步应用同一屏蔽规则
     }
 
     /// <summary>
@@ -115,19 +108,8 @@ public class SearchService : ISearchService, IDisposable
         var ext = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
         if (!_contentExts.Contains(ext, StringComparer.OrdinalIgnoreCase)) return false;
 
-        // 2. 路径逐段过滤：点开头目录（.git/.vscode）、黑名单目录、用户 ExcludePaths 模式
-        var segments = path.Split(Path.DirectorySeparatorChar);
-        foreach (var seg in segments)
-        {
-            if (seg.Length > 0 && seg[0] == '.') return false;
-            if (SkipDirNames.Contains(seg)) return false;
-            foreach (var pat in _excludePatterns)
-            {
-                var name = pat.Trim('*', '\\', '/'); // "*\node_modules" → "node_modules"
-                if (name.Length > 0 && name.Equals(seg, StringComparison.OrdinalIgnoreCase)) return false;
-            }
-        }
-        return true;
+        // 2. 路径排除过滤（黑名单/点开头/用户 ExcludePaths，与文件名搜索共用同一规则）
+        return !PathFilter.IsExcluded(path, _excludePatterns);
     }
 
     /// <summary>文件名索引文件总数</summary>
@@ -611,7 +593,7 @@ public class SearchService : ISearchService, IDisposable
             {
                 var dirName = System.IO.Path.GetFileName(subDir);
                 if (dirName.Length > 0 && dirName[0] == '.') continue;
-                if (SkipDirNames.Contains(dirName)) continue; // 与 watcher 事件过滤共用同一黑名单
+                if (PathFilter.IsExcluded(subDir, _excludePatterns)) continue; // 与 watcher 事件过滤共用同一规则
                 dirs.Enqueue(subDir);
             }
 
