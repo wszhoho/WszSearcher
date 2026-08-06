@@ -53,7 +53,7 @@
                             Cursor="Hand"
                             Click="OnCloseClick"
                             Content="✕"
-                            ToolTip="关闭 (Alt+Space)" />
+                            ToolTip="{DynamicResource Lang.Main.CloseTooltip}" />
                     <!-- 搜索输入框（带 placeholder 提示） -->
                     <Grid>
                         <TextBox x:Name="SearchBox"
@@ -127,7 +127,7 @@
                             </Style.Triggers>
                         </Style>
                     </StackPanel.Style>
-                    <TextBlock Text="正在建立索引..."
+                    <TextBlock Text="{DynamicResource Lang.Main.Indexing}"
                                FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"
                                HorizontalAlignment="Center" Margin="0,0,0,8" />
                     <ProgressBar Width="200" Height="4" IsIndeterminate="True"
@@ -150,7 +150,7 @@
                             </Style.Triggers>
                         </Style>
                     </StackPanel.Style>
-                    <TextBlock Text="搜索中..."
+                    <TextBlock Text="{DynamicResource Lang.Main.Searching}"
                                FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"
                                HorizontalAlignment="Center" Margin="0,0,0,8" />
                     <ProgressBar Width="200" Height="4" IsIndeterminate="True"
@@ -167,9 +167,9 @@
                     <!-- 结果数量提示 -->
                     <Border Grid.Row="0" Padding="12,6" Background="{DynamicResource BgBrush}">
                         <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}">
-                            <Run Text="找到 " />
+                            <Run Text="{DynamicResource Lang.Main.ResultCountPrefix}" />
                             <Run Text="{Binding ResultCount}" FontWeight="SemiBold" />
-                            <Run Text=" 个结果" />
+                            <Run Text="{DynamicResource Lang.Main.ResultCountSuffix}" />
                         </TextBlock>
                     </Border>
 
@@ -186,20 +186,20 @@
                         <ListBox.ContextMenu>
                             <ContextMenu DataContext="{Binding PlacementTarget.DataContext,
                                 RelativeSource={RelativeSource Self}}">
-                                <MenuItem Header="打开文件"
+                                <MenuItem Header="{DynamicResource Lang.Main.ContextOpen}"
                                           Command="{Binding OpenFileCommand}"
                                           CommandParameter="{Binding SelectedResult.FullPath}" />
-                                <MenuItem Header="打开文件位置"
+                                <MenuItem Header="{DynamicResource Lang.Main.ContextOpenLocation}"
                                           Command="{Binding OpenFileLocationCommand}"
                                           CommandParameter="{Binding SelectedResult.FullPath}" />
                                 <Separator />
-                                <MenuItem Header="复制文件"
+                                <MenuItem Header="{DynamicResource Lang.Main.ContextCopyFile}"
                                           Command="{Binding CopyFileCommand}"
                                           CommandParameter="{Binding SelectedResult.FullPath}" />
-                                <MenuItem Header="复制文件名"
+                                <MenuItem Header="{DynamicResource Lang.Main.ContextCopyFileName}"
                                           Command="{Binding CopyFileNameCommand}"
                                           CommandParameter="{Binding SelectedResult.FullPath}" />
-                                <MenuItem Header="复制完整路径"
+                                <MenuItem Header="{DynamicResource Lang.Main.ContextCopyFullPath}"
                                           Command="{Binding CopyFullPathCommand}"
                                           CommandParameter="{Binding SelectedResult.FullPath}" />
                             </ContextMenu>
@@ -260,7 +260,7 @@
                 </Grid>
 
                 <!-- 搜索无结果 -->
-                <TextBlock Text="未搜索到任何内容"
+                <TextBlock Text="{DynamicResource Lang.Main.NoResults}"
                            FontSize="14"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            HorizontalAlignment="Center"

@@ -4,9 +4,11 @@ using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using WszSearcher.Core.Localization;
 using WszSearcher.Core.Native;
 using WszSearcher.Core.Preview;
 using WszSearcher.Core.Search;
+using WszSearcher.Services;
 
 namespace WszSearcher.ViewModels;
 
@@ -23,6 +25,7 @@ public partial class MainViewModel : ObservableObject
     private System.Timers.Timer? _idleRecycleTimer;       // 周期空闲检测回收
     private DateTime _lastUserInputTime = DateTime.UtcNow; // 最近一次搜索输入时间
     private int _recycling;                               // 0=空闲 1=回收中（防重入）
+    private StatusMessage? _lastStatusMessage;            // 最近一条状态消息（语言切换后重译）
 
     public MainViewModel(ISearchService searchService, IPreviewService previewService)
     {
@@ -30,9 +33,14 @@ public partial class MainViewModel : ObservableObject
         _previewService = previewService;
         _searchService.ResultsUpdated += OnSearchResultsUpdated;
         _searchService.StatusChanged += OnSearchStatusChanged;
-        _searchService.StatusMessage += msg => StatusMessage = msg;
+        _searchService.StatusMessage += msg =>
+        {
+            _lastStatusMessage = msg;
+            StatusMessage = LanguageManager.Get(msg.Key, msg.Args);
+        };
         _searchService.ProgressChanged += count => IndexProgress = count;
         _searchService.IndexUpdated += OnIndexUpdated;
+        LanguageManager.LanguageChanged += OnLanguageChanged; // 运行时切换语言时刷新代码侧文本
 
         // 初始化防抖定时器（150ms）
         _debounceTimer = new System.Timers.Timer(150) { AutoReset = false };
@@ -50,6 +58,9 @@ public partial class MainViewModel : ObservableObject
         _idleRecycleTimer = new System.Timers.Timer(60_000) { AutoReset = true };
         _idleRecycleTimer.Elapsed += OnIdleRecycleCheck;
         _idleRecycleTimer.Start();
+
+        // 初始化占位提示（构造时状态为 Idle，StatusChanged 不会触发，需显式设置）
+        PlaceholderText = LanguageManager.Get("Lang.Main.PlaceholderDefault");
     }
 
     // ─── 可观察属性 ───
@@ -104,7 +115,7 @@ public partial class MainViewModel : ObservableObject
     private bool _hasSearched;
 
     [ObservableProperty]
-    private string _placeholderText = "请先设置索引目录，重建索引后开始搜索...";
+    private string _placeholderText = "";
 
     /// <summary>搜索输入变更时触发防抖</summary>
     partial void OnSearchTextChanged(string value)
@@ -250,11 +261,12 @@ public partial class MainViewModel : ObservableObject
         {
             PreviewContent = new PreviewResult
             {
-                Content = $"[加载预览失败：{ex switch {
-                    IOException => "文件正在被其他程序使用",
-                    UnauthorizedAccessException => "没有读取权限",
+                Content = LanguageManager.Get("Lang.Main.PreviewLoadFailed", ex switch
+                {
+                    IOException => LanguageManager.Get("Lang.Main.PreviewBusy"),
+                    UnauthorizedAccessException => LanguageManager.Get("Lang.Main.PreviewNoPermission"),
                     _ => ex.Message
-                }}]",
+                }),
                 Type = PreviewType.Text,
                 Title = Path.GetFileName(filePath),
                 FilePath = filePath
@@ -320,6 +332,19 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>语言切换后刷新代码侧状态文本（XAML DynamicResource 自动刷新，无需处理）</summary>
+    private void OnLanguageChanged()
+    {
+        if (_lastStatusMessage is not null)
+            StatusMessage = LanguageManager.Get(_lastStatusMessage.Key, _lastStatusMessage.Args);
+        PlaceholderText = _searchService.Status switch
+        {
+            SearchStatus.Indexing => LanguageManager.Get("Lang.Main.PlaceholderIndexing"),
+            SearchStatus.Ready => LanguageManager.Get("Lang.Main.PlaceholderReady"),
+            _ => LanguageManager.Get("Lang.Main.PlaceholderDefault")
+        };
+    }
+
     private void OnSearchStatusChanged(SearchStatus status)
     {
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
@@ -332,9 +357,9 @@ public partial class MainViewModel : ObservableObject
 
             PlaceholderText = status switch
             {
-                SearchStatus.Indexing => "正在建立索引...",
-                SearchStatus.Ready => "Alt+Space 呼出 · 输入关键词搜索...",
-                _ => "请先设置索引目录，重建索引后开始搜索..."
+                SearchStatus.Indexing => LanguageManager.Get("Lang.Main.PlaceholderIndexing"),
+                SearchStatus.Ready => LanguageManager.Get("Lang.Main.PlaceholderReady"),
+                _ => LanguageManager.Get("Lang.Main.PlaceholderDefault")
             };
         });
     }

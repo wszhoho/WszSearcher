@@ -44,6 +44,9 @@ public class AppSettings
     /// <summary>全局快捷键虚拟键码（默认 VK_SPACE=0x20）</summary>
     public uint HotkeyKey { get; set; } = 0x20; // VK_SPACE
 
+    /// <summary>界面语言（zh-CN / zh-TW / en，默认简体中文）</summary>
+    public string Language { get; set; } = LanguageManager.DefaultCulture;
+
     // ─── 加载/保存 ───
 
     public static AppSettings Load()

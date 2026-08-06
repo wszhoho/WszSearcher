@@ -1,0 +1,144 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- ═══ 托盘 ═══ -->
+    <sys:String x:Key="Lang.Tray.Tooltip">WszSearcher - 文件搜索</sys:String>
+    <sys:String x:Key="Lang.Tray.ShowWindow">顯示窗口</sys:String>
+    <sys:String x:Key="Lang.Tray.Settings">設置</sys:String>
+    <sys:String x:Key="Lang.Tray.About">關於</sys:String>
+    <sys:String x:Key="Lang.Tray.Exit">退出</sys:String>
+
+    <!-- ═══ 主窗口 ═══ -->
+    <sys:String x:Key="Lang.Main.CloseTooltip">關閉 (Alt+Space)</sys:String>
+    <sys:String x:Key="Lang.Main.Indexing">正在建立索引...</sys:String>
+    <sys:String x:Key="Lang.Main.Searching">搜索中...</sys:String>
+    <sys:String x:Key="Lang.Main.ResultCountPrefix">找到 </sys:String>
+    <sys:String x:Key="Lang.Main.ResultCountSuffix"> 個結果</sys:String>
+    <sys:String x:Key="Lang.Main.NoResults">未搜索到任何內容</sys:String>
+    <sys:String x:Key="Lang.Main.ContextOpen">打開文件</sys:String>
+    <sys:String x:Key="Lang.Main.ContextOpenLocation">打開文件位置</sys:String>
+    <sys:String x:Key="Lang.Main.ContextCopyFile">複製文件</sys:String>
+    <sys:String x:Key="Lang.Main.ContextCopyFileName">複製文件名</sys:String>
+    <sys:String x:Key="Lang.Main.ContextCopyFullPath">複製完整路徑</sys:String>
+    <sys:String x:Key="Lang.Main.PlaceholderDefault">請先設置索引目錄，重建索引後開始搜索...</sys:String>
+    <sys:String x:Key="Lang.Main.PlaceholderIndexing">正在建立索引...</sys:String>
+    <sys:String x:Key="Lang.Main.PlaceholderReady">Alt+Space 呼出 · 輸入關鍵詞搜索...</sys:String>
+    <sys:String x:Key="Lang.Main.PreviewLoadFailed">[加載預覽失敗：{0}]</sys:String>
+    <sys:String x:Key="Lang.Main.PreviewBusy">文件正在被其他程序使用</sys:String>
+    <sys:String x:Key="Lang.Main.PreviewNoPermission">沒有讀取權限</sys:String>
+
+    <!-- ═══ 设置窗口 ═══ -->
+    <sys:String x:Key="Lang.Settings.Title">WszSearcher 設置</sys:String>
+    <sys:String x:Key="Lang.Settings.Subtitle">配置搜索範圍、快捷鍵和索引選項</sys:String>
+    <sys:String x:Key="Lang.Settings.HotkeySection">全局快捷鍵</sys:String>
+    <sys:String x:Key="Lang.Settings.HotkeyDesc">用於快速呼出/隱藏搜索窗口</sys:String>
+    <sys:String x:Key="Lang.Settings.Modifiers">修飾鍵</sys:String>
+    <sys:String x:Key="Lang.Settings.Key">按鍵</sys:String>
+    <sys:String x:Key="Lang.Settings.CurrentHotkey">當前快捷鍵：</sys:String>
+    <sys:String x:Key="Lang.Settings.TestConflict">檢測衝突</sys:String>
+    <sys:String x:Key="Lang.Settings.IndexScopeSection">索引範圍</sys:String>
+    <sys:String x:Key="Lang.Settings.IndexScopeDesc">掃描以下路徑建立文件索引：</sys:String>
+    <sys:String x:Key="Lang.Settings.AddPath">+ 添加路徑</sys:String>
+    <sys:String x:Key="Lang.Settings.ExcludeSection">排除規則</sys:String>
+    <sys:String x:Key="Lang.Settings.ExcludeDesc">跳過匹配以下模式的目錄（逗號分隔）：</sys:String>
+    <sys:String x:Key="Lang.Settings.ContentExtSection">全文索引文件類型</sys:String>
+    <sys:String x:Key="Lang.Settings.ContentExtDesc">對以下後綴建立內容索引（逗號分隔，不含點）：</sys:String>
+    <sys:String x:Key="Lang.Settings.SearchOptionsSection">搜索選項</sys:String>
+    <sys:String x:Key="Lang.Settings.AutoStart">開機自動啓動</sys:String>
+    <sys:String x:Key="Lang.Settings.MaxResults">最大搜索結果數：</sys:String>
+    <sys:String x:Key="Lang.Settings.IndexStatusSection">索引狀態</sys:String>
+    <sys:String x:Key="Lang.Settings.FileNameIndex">文件名索引</sys:String>
+    <sys:String x:Key="Lang.Settings.ContentIndex">內容索引</sys:String>
+    <sys:String x:Key="Lang.Settings.RebuildIndex">重建索引</sys:String>
+    <sys:String x:Key="Lang.Settings.StopIndex">停止索引</sys:String>
+    <sys:String x:Key="Lang.Settings.RefreshStats">刷新統計</sys:String>
+    <sys:String x:Key="Lang.Settings.LanguageSection">語言</sys:String>
+    <sys:String x:Key="Lang.Settings.LanguageZhCN">簡體中文</sys:String>
+    <sys:String x:Key="Lang.Settings.LanguageZhTW">繁體中文</sys:String>
+    <sys:String x:Key="Lang.Settings.LanguageEn">English</sys:String>
+    <sys:String x:Key="Lang.Settings.About">關於</sys:String>
+    <sys:String x:Key="Lang.Settings.Cancel">取消</sys:String>
+    <sys:String x:Key="Lang.Settings.Save">保存設置</sys:String>
+    <sys:String x:Key="Lang.Settings.Ready">就緒</sys:String>
+    <sys:String x:Key="Lang.Settings.ChooseFolder">選擇要索引的文件夾</sys:String>
+    <sys:String x:Key="Lang.Settings.PathExists">該路徑已存在</sys:String>
+    <sys:String x:Key="Lang.Settings.SelectKeyFirst">請先選擇按鍵</sys:String>
+    <sys:String x:Key="Lang.Settings.HotkeyOccupied">快捷鍵 {0} 已被其他程序佔用，請更換</sys:String>
+    <sys:String x:Key="Lang.Settings.HotkeyAvailable">快捷鍵 {0} 可用</sys:String>
+    <sys:String x:Key="Lang.Settings.ConflictTestPassed">檢測通過</sys:String>
+    <sys:String x:Key="Lang.Settings.AddIndexPathFirst">請先添加索引路徑</sys:String>
+    <sys:String x:Key="Lang.Settings.RebuildFailed">重建失敗：{0}</sys:String>
+    <sys:String x:Key="Lang.Settings.Saved">設置已保存。</sys:String>
+
+    <!-- ═══ 关于窗口 ═══ -->
+    <sys:String x:Key="Lang.About.Title">關於 WszSearcher</sys:String>
+    <sys:String x:Key="Lang.About.ProjectIntro">項目簡介</sys:String>
+    <sys:String x:Key="Lang.About.Description">基於 USN Journal + Lucene.NET，實現毫秒級文件名和內容檢索。jieba 中文分詞、拼音首字母/全拼輔助模糊匹配。支持多盤多目錄索引、自定義全局快捷鍵、浮動文件預覽、系統托盤駐留。便攜綠色版，不寫入系統目錄。</sys:String>
+    <sys:String x:Key="Lang.About.TechStack">技術棧</sys:String>
+    <sys:String x:Key="Lang.About.TechDesktop">桌面應用框架</sys:String>
+    <sys:String x:Key="Lang.About.TechUsn">NTFS MFT 毫秒級掃描</sys:String>
+    <sys:String x:Key="Lang.About.TechLucene">全文檢索引擎</sys:String>
+    <sys:String x:Key="Lang.About.TechJieba">中文分詞</sys:String>
+    <sys:String x:Key="Lang.About.TechPinyin">拼音首字母模糊搜索</sys:String>
+    <sys:String x:Key="Lang.About.TechPdf">PDF 文檔解析</sys:String>
+    <sys:String x:Key="Lang.About.TechOffice">Office 文檔解析</sys:String>
+    <sys:String x:Key="Lang.About.TechTray">系統托盤駐留</sys:String>
+    <sys:String x:Key="Lang.About.TechMvvm">MVVM 架構</sys:String>
+    <sys:String x:Key="Lang.About.License">許可</sys:String>
+    <sys:String x:Key="Lang.About.LicenseText">© 2026 wszhoho. MIT License. 本軟件按"原樣"提供，不提供任何形式的明示或暗示擔保。</sys:String>
+    <sys:String x:Key="Lang.About.OK">確定</sys:String>
+
+    <!-- ═══ 预览窗口 ═══ -->
+    <sys:String x:Key="Lang.Preview.Title">預覽</sys:String>
+    <sys:String x:Key="Lang.Preview.Copy">複製全文</sys:String>
+    <sys:String x:Key="Lang.Preview.Prev">上一個</sys:String>
+    <sys:String x:Key="Lang.Preview.Next">下一個</sys:String>
+    <sys:String x:Key="Lang.Preview.TruncatedTail">... (已截斷，共 {0} 行)</sys:String>
+    <sys:String x:Key="Lang.Preview.TruncatedSkipHead">... (上略 {0} 行)</sys:String>
+    <sys:String x:Key="Lang.Preview.TruncatedMiddle">... (已截斷，共 {0} 行)</sys:String>
+
+    <!-- ═══ 通用消息框 ═══ -->
+    <sys:String x:Key="Lang.Message.Notice">提示</sys:String>
+    <sys:String x:Key="Lang.Message.AlreadyRunning">WszSearcher 已在運行中，請檢查系統托盤。</sys:String>
+    <sys:String x:Key="Lang.Message.HotkeyConflictTitle">快捷鍵衝突</sys:String>
+    <sys:String x:Key="Lang.Message.HotkeyRegisterFailed">快捷鍵註冊失敗，可能被其他程序佔用，請重新設置。</sys:String>
+
+    <!-- ═══ Core 状态消息 ═══ -->
+    <sys:String x:Key="Status.LoadingFileNameIndex">正在加載文件名索引...</sys:String>
+    <sys:String x:Key="Status.ContentIndexReady">內容索引已就緒</sys:String>
+    <sys:String x:Key="Status.ContentIndexNotBuilt">內容索引未建立，請在設置中手動重建</sys:String>
+    <sys:String x:Key="Status.ContentIndexCompleteNoBackfill">內容索引已完整，無需補齊</sys:String>
+    <sys:String x:Key="Status.BackfillingMissingIndex">正在補齊缺失的內容索引（{0} 個文件）...</sys:String>
+    <sys:String x:Key="Status.BackfillComplete">內容索引補齊完成：新增 {0} 個文檔</sys:String>
+    <sys:String x:Key="Status.BackfillCancelled">內容索引補齊已取消</sys:String>
+    <sys:String x:Key="Status.BuildingFileNameIndex">正在建立文件名索引...</sys:String>
+    <sys:String x:Key="Status.BuildingContentIndex">正在建立內容索引...</sys:String>
+    <sys:String x:Key="Status.ContentIndexBuildFailed">內容索引建立失敗：{0}</sys:String>
+    <sys:String x:Key="Status.ContentIndexCancelled">內容索引已取消</sys:String>
+    <sys:String x:Key="Status.ContentIndexRebuildFailed">內容索引重建失敗：{0}</sys:String>
+    <sys:String x:Key="Status.RebuildComplete">索引重建完成！文件名 {0} 個，內容 {1} 個</sys:String>
+    <sys:String x:Key="Status.IndexCancelledFileName">文件名索引已取消</sys:String>
+    <sys:String x:Key="Status.IndexCancelledContent">內容索引已取消</sys:String>
+    <sys:String x:Key="Status.FileNameIndexReady">索引就緒，共 {0} 個文件</sys:String>
+    <sys:String x:Key="Status.FileNameScanCancelled">文件名掃描已取消</sys:String>
+    <sys:String x:Key="Status.FileNameIndexFailed">索引失敗：{0}</sys:String>
+    <sys:String x:Key="Status.FileWatcherStartFailed">盤符 {0}: 文件監聽啓動失敗（不影響搜索）：{1}</sys:String>
+    <sys:String x:Key="Status.FileWatcherError">文件監聽異常：{0}</sys:String>
+    <sys:String x:Key="Status.UsnUnavailableFallback">無法訪問卷 {0}，將使用目錄遍歷方式（需要管理員權限運行以獲得最大速度）</sys:String>
+    <sys:String x:Key="Status.UsnNotAvailable">USN Journal 不可用，使用目錄遍歷方式</sys:String>
+    <sys:String x:Key="Status.EnumeratingMft">正在枚舉 MFT 記錄（USN範圍: {0} ~ {1}）...</sys:String>
+    <sys:String x:Key="Status.ScannedRecords">已掃描 {0} 條記錄...</sys:String>
+    <sys:String x:Key="Status.MftScanComplete">MFT 掃描完成，共 {0} 條記錄，正在解析路徑...</sys:String>
+    <sys:String x:Key="Status.ResolvingPaths">正在解析路徑... {0}/{1}</sys:String>
+    <sys:String x:Key="Status.ScanComplete">掃描完成！共 {0} 個文件，耗時 {1:F1} 秒</sys:String>
+    <sys:String x:Key="Status.NoFilesToIndex">內容索引：沒有找到需要索引的文件，跳過重建</sys:String>
+    <sys:String x:Key="Status.ContentIndexingProgress">內容索引中... 已處理 {0} 個文件</sys:String>
+    <sys:String x:Key="Status.ContentIndexComplete">內容索引完成！共 {0} 個文檔，耗時 {1:F1} 秒</sys:String>
+    <sys:String x:Key="Status.PreviewFileNotFound">[文件不存在：{0}]</sys:String>
+    <sys:String x:Key="Status.PreviewLoadFailed">[預覽失敗：{0}]</sys:String>
+    <sys:String x:Key="Status.PreviewBinaryNotSupported">[無法提取文件內容：{0}]</sys:String>
+    <sys:String x:Key="Status.PreviewFileTooLarge">[文件過大（{0}），超過 100MB 限制，無法預覽]</sys:String>
+    <sys:String x:Key="Status.PreviewCancelled">[預覽已取消]</sys:String>
+
+</ResourceDictionary>

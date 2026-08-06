@@ -27,8 +27,8 @@ namespace WszSearcher;
         _singleInstanceMutex = new Mutex(true, @"Global\WszSearcher_SingleInstance", out bool createdNew);
         if (!createdNew)
         {
-            System.Windows.MessageBox.Show("WszSearcher 已在运行中，请检查系统托盘。",
-                "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Windows.MessageBox.Show(LanguageManager.Get("Lang.Message.AlreadyRunning"),
+                LanguageManager.Get("Lang.Message.Notice"), MessageBoxButton.OK, MessageBoxImage.Information);
             Current.Shutdown();
             return;
         }
@@ -37,6 +37,9 @@ namespace WszSearcher;
 
         // 加载设置
         _settings = AppSettings.Load();
+
+        // 应用界面语言（设置窗口/主窗口创建前生效）
+        LanguageManager.ChangeLanguage(_settings.Language);
 
         // 同步开机自启注册表
         SyncAutoStart();
@@ -221,8 +224,8 @@ namespace WszSearcher;
         if (!success)
         {
             System.Windows.MessageBox.Show(
-                "快捷键注册失败，可能被其他程序占用，请重新设置。",
-                "快捷键冲突", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                LanguageManager.Get("Lang.Message.HotkeyRegisterFailed"),
+                LanguageManager.Get("Lang.Message.HotkeyConflictTitle"), System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
         }
     }
 }

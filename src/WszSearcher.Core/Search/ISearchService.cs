@@ -1,3 +1,4 @@
+using WszSearcher.Core.Localization;
 using WszSearcher.Core.Models;
 
 namespace WszSearcher.Core.Search;
@@ -11,8 +12,8 @@ public interface ISearchService
     /// <summary>搜索状态变更事件</summary>
     event Action<SearchStatus>? StatusChanged;
 
-    /// <summary>索引状态消息</summary>
-    event Action<string>? StatusMessage;
+    /// <summary>索引状态消息（携带资源 key 与参数，由 UI 层翻译显示）</summary>
+    event Action<StatusMessage>? StatusMessage;
 
     /// <summary>索引进度（已处理文件数）</summary>
     event Action<int>? ProgressChanged;

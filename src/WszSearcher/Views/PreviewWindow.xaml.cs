@@ -190,6 +190,21 @@ public partial class PreviewWindow : Window
         }
 
         rtb.Document.Blocks.Add(para);
+
+        // 截断提示（PreviewService 只携带元数据，文案由 UI 层按当前语言生成）
+        if (content.TruncatedTotalLines is int total)
+        {
+            var skip = content.TruncatedSkipLines ?? 0;
+            var tip = skip > 0
+                ? $"{Services.LanguageManager.Get("Lang.Preview.TruncatedSkipHead", skip)}\n{Services.LanguageManager.Get("Lang.Preview.TruncatedMiddle", total)}"
+                : Services.LanguageManager.Get("Lang.Preview.TruncatedTail", total);
+            rtb.Document.Blocks.Add(new Paragraph(new Run(tip))
+            {
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x9A, 0x9A, 0x9A)),
+                FontSize = 11
+            });
+        }
+
         UpdateMatchLabel();
         Dispatcher.BeginInvoke(new Action(() => ScrollToMatch(-1)),
             System.Windows.Threading.DispatcherPriority.Loaded);

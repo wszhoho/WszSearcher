@@ -1,4 +1,5 @@
 using WszSearcher.Core.ContentSearch.Parsers;
+using WszSearcher.Core.Localization;
 
 namespace WszSearcher.Core.Preview;
 
@@ -32,7 +33,8 @@ public class PreviewService : IPreviewService
             {
                 return new PreviewResult
                 {
-                    Content = $"[文件不存在：{fileName}]",
+                    StatusKey = StatusKeys.PreviewFileNotFound,
+                    StatusArgs = [fileName],
                     Type = PreviewType.Text,
                     Title = fileName,
                     FilePath = filePath
@@ -45,7 +47,8 @@ public class PreviewService : IPreviewService
             {
                 return new PreviewResult
                 {
-                    Content = $"[文件过大（{FormatSize(fileInfo.Length)}），超过 100MB 限制，无法预览]",
+                    StatusKey = StatusKeys.PreviewFileTooLarge,
+                    StatusArgs = [FormatSize(fileInfo.Length)],
                     Type = PreviewType.Text,
                     Title = fileName,
                     FilePath = filePath
@@ -67,7 +70,7 @@ public class PreviewService : IPreviewService
         {
             return new PreviewResult
             {
-                Content = "[预览已取消]",
+                StatusKey = StatusKeys.PreviewCancelled,
                 Type = PreviewType.Text,
                 Title = fileName,
                 FilePath = filePath
@@ -77,7 +80,8 @@ public class PreviewService : IPreviewService
         {
             return new PreviewResult
             {
-                Content = $"[预览失败：{ex.Message}]",
+                StatusKey = StatusKeys.PreviewLoadFailed,
+                StatusArgs = [ex.Message],
                 Type = PreviewType.Text,
                 Title = fileName,
                 FilePath = filePath
@@ -125,7 +129,8 @@ public class PreviewService : IPreviewService
         {
             return new PreviewResult
             {
-                Content = $"[无法提取文件内容：{fileName}]",
+                StatusKey = StatusKeys.PreviewBinaryNotSupported,
+                StatusArgs = [fileName],
                 Type = PreviewType.Text,
                 Title = fileName,
                 FilePath = filePath
@@ -136,7 +141,10 @@ public class PreviewService : IPreviewService
         text = System.Text.RegularExpressions.Regex.Replace(text, @"\n{2,}", "\n");
 
         // 限制行数（若关键词在截断区之后，则以关键词行为中心保留窗口，保证高亮可见）
+        // 截断提示行不在此拼接（保持文本纯净），改由 PreviewResult 携带截断元数据，UI 层按当前语言追加提示
         var lines = text.Split('\n');
+        int? truncatedTotal = null;
+        int? truncatedSkip = null;
         if (lines.Length > MaxPreviewLines)
         {
             int keywordLine = -1;
@@ -148,9 +156,10 @@ public class PreviewService : IPreviewService
 
             if (keywordLine < 0 || keywordLine < MaxPreviewLines)
             {
-                // 无关键词，或关键词本就在前 MaxPreviewLines 行内——保持原截断逻辑
-                text = string.Join('\n', lines.Take(MaxPreviewLines))
-                     + $"\n\n... (已截断，共 {lines.Length} 行，仅显示前 {MaxPreviewLines} 行)";
+                // 无关键词，或关键词本就在前 MaxPreviewLines 行内——只保留前 MaxPreviewLines 行
+                text = string.Join('\n', lines.Take(MaxPreviewLines));
+                truncatedTotal = lines.Length;
+                truncatedSkip = 0;
             }
             else
             {
@@ -158,11 +167,9 @@ public class PreviewService : IPreviewService
                 int start = keywordLine - MaxPreviewLines / 2;
                 start = Math.Max(0, Math.Min(start, lines.Length - MaxPreviewLines));
                 var window = lines[start..(start + MaxPreviewLines)];
-                var prefix = start > 0 ? $"... (上略 {start} 行)\n" : "";
-                var suffix = start + MaxPreviewLines < lines.Length
-                    ? $"\n\n... (已截断，共 {lines.Length} 行)"
-                    : "";
-                text = prefix + string.Join('\n', window) + suffix;
+                text = string.Join('\n', window);
+                truncatedTotal = lines.Length;
+                truncatedSkip = start;
             }
         }
 
@@ -172,6 +179,8 @@ public class PreviewService : IPreviewService
             Type = type,
             Title = fileName,
             FilePath = filePath,
+            TruncatedTotalLines = truncatedTotal,
+            TruncatedSkipLines = truncatedSkip,
             HighlightSegments = BuildHighlightSegments(text, keyword) // 后台线程预处理高亮分段
         };
     }

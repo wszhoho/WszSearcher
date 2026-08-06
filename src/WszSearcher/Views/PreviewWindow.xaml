@@ -1,7 +1,7 @@
 ﻿<Window x:Class="WszSearcher.Views.PreviewWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="预览"
+        Title="{DynamicResource Lang.Preview.Title}"
         Width="360" Height="480"
         MinWidth="280" MinHeight="200"
         WindowStyle="ToolWindow"
@@ -48,18 +48,18 @@
                     <Button Width="28" Height="24" Click="OnCopyContent"
                             Background="Transparent" BorderThickness="0"
                             FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}"
-                            Cursor="Hand" Content="📋" ToolTip="复制全文" />
+                            Cursor="Hand" Content="📋" ToolTip="{DynamicResource Lang.Preview.Copy}" />
                     <Button Width="28" Height="24" Click="OnPrevMatch"
                             Background="Transparent" BorderThickness="0"
                             FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
-                            Cursor="Hand" Content="▲" ToolTip="上一个" />
+                            Cursor="Hand" Content="▲" ToolTip="{DynamicResource Lang.Preview.Prev}" />
                     <TextBlock x:Name="MatchLabel" Text="" FontSize="10"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center" Margin="4,0" />
                     <Button Width="28" Height="24" Click="OnNextMatch"
                             Background="Transparent" BorderThickness="0"
                             FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
-                            Cursor="Hand" Content="▼" ToolTip="下一个" />
+                            Cursor="Hand" Content="▼" ToolTip="{DynamicResource Lang.Preview.Next}" />
                     <Button Width="24" Height="24" Margin="8,0,0,0"
                             Background="Transparent" BorderThickness="0"
                             FontSize="14"

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using WszSearcher.Core.Localization;
 using WszSearcher.Core.Native;
 
 namespace WszSearcher.Core.FileNameSearch;
@@ -14,8 +15,8 @@ public class UsnFileScanner
 
     /// <summary>扫描进度报告</summary>
     public event Action<int>? ProgressChanged;
-    /// <summary>扫描状态报告</summary>
-    public event Action<string>? StatusChanged;
+    /// <summary>扫描状态报告（携带资源 key 与参数，由 UI 层翻译显示）</summary>
+    public event Action<StatusMessage>? StatusChanged;
 
     /// <summary>是否已取消</summary>
     public CancellationToken CancellationToken { get; set; }
@@ -42,7 +43,7 @@ public class UsnFileScanner
         if (volumeHandle.IsInvalid)
         {
             AppLog.Warn("fname", $"USN 无法打开卷 {_volume}（需要管理员权限）");
-            StatusChanged?.Invoke($"无法访问卷 {_volume}，将使用目录遍历方式（需要管理员权限运行以获得最大速度）");
+            StatusChanged?.Invoke(new StatusMessage(StatusKeys.UsnUnavailableFallback, _volume));
             return FallbackScan(fallbackPaths);
         }
 
@@ -50,11 +51,11 @@ public class UsnFileScanner
         if (!UsnApi.QueryUsnJournal(volumeHandle, out var journalData))
         {
             AppLog.Warn("fname", "USN Journal 不可用");
-            StatusChanged?.Invoke("USN Journal 不可用，使用目录遍历方式");
+            StatusChanged?.Invoke(new StatusMessage(StatusKeys.UsnNotAvailable));
             return FallbackScan(fallbackPaths);
         }
 
-        StatusChanged?.Invoke($"正在枚举 MFT 记录（USN范围: {journalData.FirstUsn} ~ {journalData.NextUsn}）...");
+        StatusChanged?.Invoke(new StatusMessage(StatusKeys.EnumeratingMft, journalData.FirstUsn, journalData.NextUsn));
         
         // Phase 1: 扫描所有 USN 记录
         var records = new Dictionary<ulong, UsnRecord>();
@@ -78,11 +79,11 @@ public class UsnFileScanner
             {
                 lastProgressReport = DateTime.UtcNow;
                 ProgressChanged?.Invoke(count);
-                StatusChanged?.Invoke($"已扫描 {count} 条记录...");
+                StatusChanged?.Invoke(new StatusMessage(StatusKeys.ScannedRecords, count));
             }
         }
 
-        StatusChanged?.Invoke($"MFT 扫描完成，共 {count} 条记录，正在解析路径...");
+        StatusChanged?.Invoke(new StatusMessage(StatusKeys.MftScanComplete, count));
         AppLog.Info("fname", $"USN 枚举完成: {count} 条记录");
 
         if (count == 0)
@@ -119,12 +120,12 @@ public class UsnFileScanner
             resolved++;
             if (resolved % batchSize == 0)
             {
-                StatusChanged?.Invoke($"正在解析路径... {resolved}/{count}");
+                StatusChanged?.Invoke(new StatusMessage(StatusKeys.ResolvingPaths, resolved, count));
             }
         }
 
         sw.Stop();
-        StatusChanged?.Invoke($"扫描完成！共 {result.Count} 个文件，耗时 {sw.Elapsed.TotalSeconds:F1} 秒");
+        StatusChanged?.Invoke(new StatusMessage(StatusKeys.ScanComplete, result.Count, sw.Elapsed.TotalSeconds));
 
         return result;
     }
@@ -224,7 +225,7 @@ public class UsnFileScanner
 
     sw.Stop();
     AppLog.Info("fname", $"Fallback 完成: {result.Count} 个文件");
-    StatusChanged?.Invoke($"目录遍历完成！共 {result.Count} 个文件，耗时 {sw.Elapsed.TotalSeconds:F1} 秒");
+    StatusChanged?.Invoke(new StatusMessage(StatusKeys.ScanComplete, result.Count, sw.Elapsed.TotalSeconds));
         return result;
     }
 }

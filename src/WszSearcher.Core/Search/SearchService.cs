@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using WszSearcher.Core.ContentSearch;
 using WszSearcher.Core.FileNameSearch;
+using WszSearcher.Core.Localization;
 using WszSearcher.Core.Models;
 
 namespace WszSearcher.Core.Search;
@@ -38,7 +39,7 @@ public class SearchService : ISearchService, IDisposable
 
     public event Action<IReadOnlyList<SearchResult>>? ResultsUpdated;
     public event Action<SearchStatus>? StatusChanged;
-    public event Action<string>? StatusMessage;
+    public event Action<StatusMessage>? StatusMessage;
     public event Action<int>? ProgressChanged;
     public event Action? IndexUpdated; // 实时索引更新完成后触发（供 UI 自动刷新结果）
 
@@ -128,7 +129,7 @@ public class SearchService : ISearchService, IDisposable
         StatusChanged?.Invoke(Status);
 
         // 1. 只做文件名扫描（USN，秒级）
-        StatusMessage?.Invoke("正在加载文件名索引...");
+        StatusMessage?.Invoke(new StatusMessage(StatusKeys.LoadingFileNameIndex));
         await _fileNameSearch.InitializeAsync();
 
         // 2. 内容索引：磁盘有就加载，没有就跳过（等用户手动重建）
@@ -137,11 +138,11 @@ public class SearchService : ISearchService, IDisposable
             _contentIndexer.IsReady = true;
             _contentIndexer.SyncDocCount();
             _contentSearcher.RefreshReadyState();
-            StatusMessage?.Invoke("内容索引已就绪");
+            StatusMessage?.Invoke(new StatusMessage(StatusKeys.ContentIndexReady));
         }
         else
         {
-            StatusMessage?.Invoke("内容索引未建立，请在设置中手动重建");
+            StatusMessage?.Invoke(new StatusMessage(StatusKeys.ContentIndexNotBuilt));
         }
 
         Status = SearchStatus.Ready;
@@ -180,24 +181,24 @@ public class SearchService : ISearchService, IDisposable
 
             if (missing.Count == 0)
             {
-                StatusMessage?.Invoke("内容索引已完整，无需补齐");
+                StatusMessage?.Invoke(new StatusMessage(StatusKeys.ContentIndexCompleteNoBackfill));
                 return;
             }
 
             // 3. 逐文件补齐（IndexFileInternal 内含 File.Exists 防复活校验）
-            StatusMessage?.Invoke($"正在补齐缺失的内容索引（{missing.Count} 个文件）...");
+            StatusMessage?.Invoke(new StatusMessage(StatusKeys.BackfillingMissingIndex, missing.Count));
             foreach (var f in missing)
             {
                 ct.ThrowIfCancellationRequested();
                 await _contentIndexer.IndexFileAsync(f, ct);
             }
             _contentIndexer.CommitChanges();
-            StatusMessage?.Invoke($"内容索引补齐完成：新增 {missing.Count} 个文档");
+            StatusMessage?.Invoke(new StatusMessage(StatusKeys.BackfillComplete, missing.Count));
             IndexUpdated?.Invoke(); // 通知 UI 刷新当前搜索结果
         }
         catch (OperationCanceledException)
         {
-            StatusMessage?.Invoke("内容索引补齐已取消");
+            StatusMessage?.Invoke(new StatusMessage(StatusKeys.BackfillCancelled));
         }
         catch (Exception ex)
         {
@@ -219,7 +220,7 @@ public class SearchService : ISearchService, IDisposable
         StatusChanged?.Invoke(Status);
 
         // 1. 文件名索引
-        StatusMessage?.Invoke("正在建立文件名索引...");
+        StatusMessage?.Invoke(new StatusMessage(StatusKeys.BuildingFileNameIndex));
         await _fileNameSearch.InitializeAsync();
 
         if (_fileNameSearch.State != IndexState.Ready)
@@ -232,7 +233,7 @@ public class SearchService : ISearchService, IDisposable
         // 2. 内容索引
         if (!_contentIndexer.IndexExists() || _contentIndexer.TryGetDocCount() == 0)
         {
-            StatusMessage?.Invoke("正在建立内容索引...");
+            StatusMessage?.Invoke(new StatusMessage(StatusKeys.BuildingContentIndex));
             try
             {
                 CancelBuild();
@@ -243,7 +244,7 @@ public class SearchService : ISearchService, IDisposable
             }
             catch (Exception ex)
             {
-                StatusMessage?.Invoke($"内容索引建立失败：{ex.Message}");
+                StatusMessage?.Invoke(new StatusMessage(StatusKeys.ContentIndexBuildFailed, ex.Message));
             }
         }
         else
@@ -251,7 +252,7 @@ public class SearchService : ISearchService, IDisposable
             _contentIndexer.IsReady = true;
             _contentIndexer.SyncDocCount();
             _contentSearcher.RefreshReadyState();
-            StatusMessage?.Invoke("内容索引已就绪");
+            StatusMessage?.Invoke(new StatusMessage(StatusKeys.ContentIndexReady));
         }
 
         _contentIndexer.CloseWriter(); // 释放 Lucene 内存
@@ -281,26 +282,26 @@ public class SearchService : ISearchService, IDisposable
         StatusChanged?.Invoke(Status);
 
         // 1. 文件名索引
-        StatusMessage?.Invoke("正在建立文件名索引...");
+        StatusMessage?.Invoke(new StatusMessage(StatusKeys.BuildingFileNameIndex));
         try
         {
             await _fileNameSearch.RebuildAsync();
         }
         catch (OperationCanceledException)
         {
-            FinishWithCancel(ct, "文件名");
+            FinishWithCancel(ct, StatusKeys.IndexCancelledFileName);
             return;
         }
 
         // 检查是否被取消（RebuildAsync 正常完成但状态未就绪的情况）
         if (ct.IsCancellationRequested || _fileNameSearch.State != IndexState.Ready)
         {
-            FinishWithCancel(ct, "文件名");
+            FinishWithCancel(ct, StatusKeys.IndexCancelledFileName);
             return;
         }
 
         // 2. 内容索引
-        StatusMessage?.Invoke("正在建立内容索引...");
+        StatusMessage?.Invoke(new StatusMessage(StatusKeys.BuildingContentIndex));
         try
         {
             await Task.Run(async () => await _contentIndexer.BuildFullIndexAsync(
@@ -310,32 +311,32 @@ public class SearchService : ISearchService, IDisposable
         catch (OperationCanceledException)
         {
             _contentIndexer.DocCount = 0;
-            StatusMessage?.Invoke("内容索引已取消");
+            StatusMessage?.Invoke(new StatusMessage(StatusKeys.ContentIndexCancelled));
             _contentIndexer.CloseWriter();
-            FinishWithCancel(ct, "内容");
+            FinishWithCancel(ct, StatusKeys.IndexCancelledContent);
             return;
         }
         catch (Exception ex)
         {
-            StatusMessage?.Invoke($"内容索引重建失败：{ex.Message}");
+            StatusMessage?.Invoke(new StatusMessage(StatusKeys.ContentIndexRebuildFailed, ex.Message));
         }
 
         _contentIndexer.CloseWriter(); // 释放 Lucene 内存
 
         Status = SearchStatus.Ready;
         StatusChanged?.Invoke(Status);
-        StatusMessage?.Invoke($"索引重建完成！文件名 {FileNameIndexCount} 个，内容 {ContentIndexCount} 个");
+        StatusMessage?.Invoke(new StatusMessage(StatusKeys.RebuildComplete, FileNameIndexCount, ContentIndexCount));
         _rebuilding = false;
         StartContentWatcher();
         DisposeBuildCts();
     }
 
     /// <summary>取消后的收尾：重置状态、清理令牌</summary>
-    private void FinishWithCancel(CancellationToken ct, string phase)
+    private void FinishWithCancel(CancellationToken ct, string statusKey)
     {
         Status = SearchStatus.Ready;
         StatusChanged?.Invoke(Status);
-        StatusMessage?.Invoke($"{phase}索引已取消");
+        StatusMessage?.Invoke(new StatusMessage(statusKey));
         _rebuilding = false;
         DisposeBuildCts();
     }

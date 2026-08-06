@@ -1,3 +1,4 @@
+using WszSearcher.Core.Localization;
 using WszSearcher.Core.Models;
 
 namespace WszSearcher.Core.FileNameSearch;
@@ -41,8 +42,8 @@ public class FileNameSearchProvider : IDisposable
     public event Action<IndexState>? StateChanged;
     /// <summary>索引进度</summary>
     public event Action<int>? ProgressChanged;
-    /// <summary>索引状态消息</summary>
-    public event Action<string>? StatusMessage;
+    /// <summary>索引状态消息（携带资源 key 与参数，由 UI 层翻译显示）</summary>
+    public event Action<StatusMessage>? StatusMessage;
 
     public IndexState State { get; private set; } = IndexState.NotInitialized;
 
@@ -130,19 +131,19 @@ public class FileNameSearchProvider : IDisposable
             StartWatchers();
 
             State = IndexState.Ready;
-            InvokeStatusMessage($"索引就绪，共 {_index.Count} 个文件");
+            InvokeStatusMessage(new StatusMessage(StatusKeys.FileNameIndexReady, _index.Count));
         }
         catch (OperationCanceledException)
         {
             State = IndexState.Error; // 取消不视为 Ready，防止继续进入内容索引
-            InvokeStatusMessage("文件名扫描已取消");
+            InvokeStatusMessage(new StatusMessage(StatusKeys.FileNameScanCancelled));
             InvokeStateChanged(State);
             return; // 不继续后续流程
         }
         catch (Exception ex)
         {
             State = IndexState.Error;
-            InvokeStatusMessage($"索引失败：{ex.Message}");
+            InvokeStatusMessage(new StatusMessage(StatusKeys.FileNameIndexFailed, ex.Message));
         }
 
         InvokeStateChanged(State);
@@ -161,7 +162,7 @@ public class FileNameSearchProvider : IDisposable
         handler?.Invoke(count);
     }
 
-    private void InvokeStatusMessage(string msg)
+    private void InvokeStatusMessage(StatusMessage msg)
     {
         var handler = StatusMessage;
         handler?.Invoke(msg);
@@ -249,7 +250,7 @@ public class FileNameSearchProvider : IDisposable
             }
             catch (Exception ex)
             {
-                InvokeStatusMessage($"盘符 {drive}: 文件监听启动失败（不影响搜索）：{ex.Message}");
+                InvokeStatusMessage(new StatusMessage(StatusKeys.FileWatcherStartFailed, drive, ex.Message));
             }
         }
     }
@@ -378,7 +379,7 @@ public class FileNameSearchProvider : IDisposable
 
     private void OnWatcherError(object sender, ErrorEventArgs e)
     {
-        InvokeStatusMessage($"文件监听异常：{e.GetException()?.Message}");
+        InvokeStatusMessage(new StatusMessage(StatusKeys.FileWatcherError, e.GetException()?.Message));
     }
 
     public void Dispose()

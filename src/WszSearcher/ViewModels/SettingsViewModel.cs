@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using WszSearcher.Core.Localization;
 using WszSearcher.Core.Search;
 using WszSearcher.Services;
 
@@ -12,6 +13,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 {
     private readonly AppSettings _settings;
     private readonly ISearchService _searchService;
+    private StatusMessage? _lastStatusMessage; // 最近一条状态消息（语言切换后重译）
     private bool _disposed;
 
     public SettingsViewModel(AppSettings settings, ISearchService searchService)
@@ -39,10 +41,15 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _searchService.StatusChanged += OnSearchStatusChanged;
         _searchService.StatusMessage += OnStatusMessage;
         _searchService.ProgressChanged += OnProgressChanged;
+        LanguageManager.LanguageChanged += OnLanguageChanged; // 运行时切换语言时刷新代码侧文本
 
         // 同步当前状态（可能在窗口打开前已变更）
         OnSearchStatusChanged(_searchService.Status);
         UpdateIndexCounts();
+
+        // 初始化状态文案与语言
+        IndexStatusMessage = LanguageManager.Get("Lang.Settings.Ready");
+        _selectedLanguage = LanguageOptions.FirstOrDefault(o => o.Code == settings.Language) ?? LanguageOptions[0];
     }
 
     // ─── 索引路径 ───
@@ -52,7 +59,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void AddIndexPath()
     {
-        var dialog = new System.Windows.Forms.FolderBrowserDialog { Description = "选择要索引的文件夹" };
+        var dialog = new System.Windows.Forms.FolderBrowserDialog
+        { Description = LanguageManager.Get("Lang.Settings.ChooseFolder") };
         if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
         {
             var existing = IndexPaths.FirstOrDefault(p =>
@@ -60,7 +68,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             if (existing is null)
                 IndexPaths.Add(new ObservablePath { Path = dialog.SelectedPath });
             else
-                System.Windows.MessageBox.Show("该路径已存在", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show(LanguageManager.Get("Lang.Settings.PathExists"),
+                    LanguageManager.Get("Lang.Message.Notice"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
@@ -129,7 +138,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     // ─── 索引管理（新增） ───
 
     [ObservableProperty]
-    private string _indexStatusMessage = "就绪";
+    private string _indexStatusMessage = "";
 
     [ObservableProperty]
     private int _indexProgress;
@@ -225,7 +234,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         var modifiers = BuildModifiers();
         if (SelectedKey is null)
         {
-            System.Windows.MessageBox.Show("请先选择按键", "提示");
+            System.Windows.MessageBox.Show(LanguageManager.Get("Lang.Settings.SelectKeyFirst"),
+                LanguageManager.Get("Lang.Message.Notice"));
             return;
         }
 
@@ -238,10 +248,12 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             _settings.HotkeyModifiers, _settings.HotkeyKey);
 
         if (hasConflict)
-            System.Windows.MessageBox.Show($"快捷键 {HotkeyPreview} 已被其他程序占用，请更换", "快捷键冲突",
+            System.Windows.MessageBox.Show(LanguageManager.Get("Lang.Settings.HotkeyOccupied", HotkeyPreview),
+                LanguageManager.Get("Lang.Message.HotkeyConflictTitle"),
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
         else
-            System.Windows.MessageBox.Show($"快捷键 {HotkeyPreview} 可用", "检测通过",
+            System.Windows.MessageBox.Show(LanguageManager.Get("Lang.Settings.HotkeyAvailable", HotkeyPreview),
+                LanguageManager.Get("Lang.Settings.ConflictTestPassed"),
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
     }
 
@@ -267,7 +279,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         var paths = _settings.IndexPaths.ToList();
         if (paths.Count == 0)
         {
-            System.Windows.MessageBox.Show("请先添加索引路径", "提示",
+            System.Windows.MessageBox.Show(LanguageManager.Get("Lang.Settings.AddIndexPathFirst"),
+                LanguageManager.Get("Lang.Message.Notice"),
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
             return;
         }
@@ -289,7 +302,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            IndexStatusMessage = $"重建失败：{ex.Message}";
+            IndexStatusMessage = LanguageManager.Get("Lang.Settings.RebuildFailed", ex.Message);
         }
     }
 
@@ -325,11 +338,19 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         });
     }
 
-    private void OnStatusMessage(string msg)
+    private void OnStatusMessage(StatusMessage msg)
     {
+        _lastStatusMessage = msg;
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
         if (dispatcher is null) return;
-        dispatcher.InvokeAsync(() => IndexStatusMessage = msg);
+        dispatcher.InvokeAsync(() => IndexStatusMessage = LanguageManager.Get(msg.Key, msg.Args));
+    }
+
+    /// <summary>语言切换后重译状态文本（XAML DynamicResource 自动刷新，无需处理）</summary>
+    private void OnLanguageChanged()
+    {
+        if (_lastStatusMessage is not null)
+            IndexStatusMessage = LanguageManager.Get(_lastStatusMessage.Key, _lastStatusMessage.Args);
     }
 
     private void OnProgressChanged(int count)
@@ -350,6 +371,30 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _searchService.StatusChanged -= OnSearchStatusChanged;
         _searchService.StatusMessage -= OnStatusMessage;
         _searchService.ProgressChanged -= OnProgressChanged;
+        LanguageManager.LanguageChanged -= OnLanguageChanged;
+    }
+
+    // ─── 界面语言 ───
+
+    /// <summary>语言选项（代码 + 母语显示名）</summary>
+    public record LanguageOption(string Code, string Display);
+
+    /// <summary>可选语言列表</summary>
+    public List<LanguageOption> LanguageOptions { get; } =
+    [
+        new("zh-CN", "简体中文"),
+        new("zh-TW", "繁體中文"),
+        new("en", "English")
+    ];
+
+    [ObservableProperty]
+    private LanguageOption? _selectedLanguage;
+
+    partial void OnSelectedLanguageChanged(LanguageOption? value)
+    {
+        if (value is null) return;
+        _settings.Language = value.Code;
+        LanguageManager.ChangeLanguage(value.Code); // 立即切换，DynamicResource 自动刷新全部绑定
     }
 
     // ─── 命令 ───
@@ -374,8 +419,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         SetAutoStart(_settings.AutoStart);
 
         // 通知用户
-        System.Windows.MessageBox.Show("设置已保存。",
-            "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+        System.Windows.MessageBox.Show(LanguageManager.Get("Lang.Settings.Saved"),
+            LanguageManager.Get("Lang.Message.Notice"), MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private static void SetAutoStart(bool enable)

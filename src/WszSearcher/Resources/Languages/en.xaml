@@ -1,0 +1,144 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- ═══ Tray ═══ -->
+    <sys:String x:Key="Lang.Tray.Tooltip">WszSearcher - File Search</sys:String>
+    <sys:String x:Key="Lang.Tray.ShowWindow">Show Window</sys:String>
+    <sys:String x:Key="Lang.Tray.Settings">Settings</sys:String>
+    <sys:String x:Key="Lang.Tray.About">About</sys:String>
+    <sys:String x:Key="Lang.Tray.Exit">Exit</sys:String>
+
+    <!-- ═══ Main Window ═══ -->
+    <sys:String x:Key="Lang.Main.CloseTooltip">Close (Alt+Space)</sys:String>
+    <sys:String x:Key="Lang.Main.Indexing">Building index...</sys:String>
+    <sys:String x:Key="Lang.Main.Searching">Searching...</sys:String>
+    <sys:String x:Key="Lang.Main.ResultCountPrefix">Found </sys:String>
+    <sys:String x:Key="Lang.Main.ResultCountSuffix"> results</sys:String>
+    <sys:String x:Key="Lang.Main.NoResults">No results found</sys:String>
+    <sys:String x:Key="Lang.Main.ContextOpen">Open File</sys:String>
+    <sys:String x:Key="Lang.Main.ContextOpenLocation">Open File Location</sys:String>
+    <sys:String x:Key="Lang.Main.ContextCopyFile">Copy File</sys:String>
+    <sys:String x:Key="Lang.Main.ContextCopyFileName">Copy File Name</sys:String>
+    <sys:String x:Key="Lang.Main.ContextCopyFullPath">Copy Full Path</sys:String>
+    <sys:String x:Key="Lang.Main.PlaceholderDefault">Please set up index directories and rebuild the index to start searching...</sys:String>
+    <sys:String x:Key="Lang.Main.PlaceholderIndexing">Building index...</sys:String>
+    <sys:String x:Key="Lang.Main.PlaceholderReady">Alt+Space to show · Type keywords to search...</sys:String>
+    <sys:String x:Key="Lang.Main.PreviewLoadFailed">[Failed to load preview: {0}]</sys:String>
+    <sys:String x:Key="Lang.Main.PreviewBusy">The file is in use by another program</sys:String>
+    <sys:String x:Key="Lang.Main.PreviewNoPermission">No read permission</sys:String>
+
+    <!-- ═══ Settings Window ═══ -->
+    <sys:String x:Key="Lang.Settings.Title">WszSearcher Settings</sys:String>
+    <sys:String x:Key="Lang.Settings.Subtitle">Configure search scope, hotkey and index options</sys:String>
+    <sys:String x:Key="Lang.Settings.HotkeySection">Global Hotkey</sys:String>
+    <sys:String x:Key="Lang.Settings.HotkeyDesc">Used to quickly show/hide the search window</sys:String>
+    <sys:String x:Key="Lang.Settings.Modifiers">Modifiers</sys:String>
+    <sys:String x:Key="Lang.Settings.Key">Key</sys:String>
+    <sys:String x:Key="Lang.Settings.CurrentHotkey">Current hotkey:</sys:String>
+    <sys:String x:Key="Lang.Settings.TestConflict">Check Conflict</sys:String>
+    <sys:String x:Key="Lang.Settings.IndexScopeSection">Index Scope</sys:String>
+    <sys:String x:Key="Lang.Settings.IndexScopeDesc">Scan the following paths to build the file index:</sys:String>
+    <sys:String x:Key="Lang.Settings.AddPath">+ Add Path</sys:String>
+    <sys:String x:Key="Lang.Settings.ExcludeSection">Exclusion Rules</sys:String>
+    <sys:String x:Key="Lang.Settings.ExcludeDesc">Skip directories matching the following patterns (comma-separated):</sys:String>
+    <sys:String x:Key="Lang.Settings.ContentExtSection">Full-text Index File Types</sys:String>
+    <sys:String x:Key="Lang.Settings.ContentExtDesc">Build content index for the following extensions (comma-separated, without dots):</sys:String>
+    <sys:String x:Key="Lang.Settings.SearchOptionsSection">Search Options</sys:String>
+    <sys:String x:Key="Lang.Settings.AutoStart">Launch at startup</sys:String>
+    <sys:String x:Key="Lang.Settings.MaxResults">Max results:</sys:String>
+    <sys:String x:Key="Lang.Settings.IndexStatusSection">Index Status</sys:String>
+    <sys:String x:Key="Lang.Settings.FileNameIndex">File Name Index</sys:String>
+    <sys:String x:Key="Lang.Settings.ContentIndex">Content Index</sys:String>
+    <sys:String x:Key="Lang.Settings.RebuildIndex">Rebuild Index</sys:String>
+    <sys:String x:Key="Lang.Settings.StopIndex">Stop Indexing</sys:String>
+    <sys:String x:Key="Lang.Settings.RefreshStats">Refresh Stats</sys:String>
+    <sys:String x:Key="Lang.Settings.LanguageSection">Language</sys:String>
+    <sys:String x:Key="Lang.Settings.LanguageZhCN">简体中文</sys:String>
+    <sys:String x:Key="Lang.Settings.LanguageZhTW">繁體中文</sys:String>
+    <sys:String x:Key="Lang.Settings.LanguageEn">English</sys:String>
+    <sys:String x:Key="Lang.Settings.About">About</sys:String>
+    <sys:String x:Key="Lang.Settings.Cancel">Cancel</sys:String>
+    <sys:String x:Key="Lang.Settings.Save">Save Settings</sys:String>
+    <sys:String x:Key="Lang.Settings.Ready">Ready</sys:String>
+    <sys:String x:Key="Lang.Settings.ChooseFolder">Select a folder to index</sys:String>
+    <sys:String x:Key="Lang.Settings.PathExists">This path already exists</sys:String>
+    <sys:String x:Key="Lang.Settings.SelectKeyFirst">Please select a key first</sys:String>
+    <sys:String x:Key="Lang.Settings.HotkeyOccupied">Hotkey {0} is already in use by another program. Please choose another.</sys:String>
+    <sys:String x:Key="Lang.Settings.HotkeyAvailable">Hotkey {0} is available</sys:String>
+    <sys:String x:Key="Lang.Settings.ConflictTestPassed">Conflict check passed</sys:String>
+    <sys:String x:Key="Lang.Settings.AddIndexPathFirst">Please add an index path first</sys:String>
+    <sys:String x:Key="Lang.Settings.RebuildFailed">Rebuild failed: {0}</sys:String>
+    <sys:String x:Key="Lang.Settings.Saved">Settings saved.</sys:String>
+
+    <!-- ═══ About Window ═══ -->
+    <sys:String x:Key="Lang.About.Title">About WszSearcher</sys:String>
+    <sys:String x:Key="Lang.About.ProjectIntro">Project Description</sys:String>
+    <sys:String x:Key="Lang.About.Description">Built on USN Journal + Lucene.NET for millisecond-level file name and content search. jieba Chinese word segmentation and pinyin initials/full spelling fuzzy matching. Supports multi-drive and multi-directory indexing, customizable global hotkey, floating file preview and system tray residency. Portable green edition; writes nothing to system directories.</sys:String>
+    <sys:String x:Key="Lang.About.TechStack">Tech Stack</sys:String>
+    <sys:String x:Key="Lang.About.TechDesktop">Desktop application framework</sys:String>
+    <sys:String x:Key="Lang.About.TechUsn">Millisecond NTFS MFT scanning</sys:String>
+    <sys:String x:Key="Lang.About.TechLucene">Full-text search engine</sys:String>
+    <sys:String x:Key="Lang.About.TechJieba">Chinese word segmentation</sys:String>
+    <sys:String x:Key="Lang.About.TechPinyin">Pinyin initials fuzzy search</sys:String>
+    <sys:String x:Key="Lang.About.TechPdf">PDF document parsing</sys:String>
+    <sys:String x:Key="Lang.About.TechOffice">Office document parsing</sys:String>
+    <sys:String x:Key="Lang.About.TechTray">System tray residency</sys:String>
+    <sys:String x:Key="Lang.About.TechMvvm">MVVM architecture</sys:String>
+    <sys:String x:Key="Lang.About.License">License</sys:String>
+    <sys:String x:Key="Lang.About.LicenseText">© 2026 wszhoho. MIT License. This software is provided "as is" without warranty of any kind, express or implied.</sys:String>
+    <sys:String x:Key="Lang.About.OK">OK</sys:String>
+
+    <!-- ═══ Preview Window ═══ -->
+    <sys:String x:Key="Lang.Preview.Title">Preview</sys:String>
+    <sys:String x:Key="Lang.Preview.Copy">Copy full text</sys:String>
+    <sys:String x:Key="Lang.Preview.Prev">Previous</sys:String>
+    <sys:String x:Key="Lang.Preview.Next">Next</sys:String>
+    <sys:String x:Key="Lang.Preview.TruncatedTail">... (truncated, {0} lines in total)</sys:String>
+    <sys:String x:Key="Lang.Preview.TruncatedSkipHead">... ({0} lines skipped)</sys:String>
+    <sys:String x:Key="Lang.Preview.TruncatedMiddle">... (truncated, {0} lines in total)</sys:String>
+
+    <!-- ═══ Common Message Box ═══ -->
+    <sys:String x:Key="Lang.Message.Notice">Notice</sys:String>
+    <sys:String x:Key="Lang.Message.AlreadyRunning">WszSearcher is already running. Please check the system tray.</sys:String>
+    <sys:String x:Key="Lang.Message.HotkeyConflictTitle">Hotkey Conflict</sys:String>
+    <sys:String x:Key="Lang.Message.HotkeyRegisterFailed">Failed to register the hotkey. It may be in use by another program. Please set it again.</sys:String>
+
+    <!-- ═══ Core Status Messages ═══ -->
+    <sys:String x:Key="Status.LoadingFileNameIndex">Loading file name index...</sys:String>
+    <sys:String x:Key="Status.ContentIndexReady">Content index ready</sys:String>
+    <sys:String x:Key="Status.ContentIndexNotBuilt">Content index not built. Please rebuild it manually in Settings.</sys:String>
+    <sys:String x:Key="Status.ContentIndexCompleteNoBackfill">Content index is complete; nothing to backfill</sys:String>
+    <sys:String x:Key="Status.BackfillingMissingIndex">Backfilling missing content index ({0} files)...</sys:String>
+    <sys:String x:Key="Status.BackfillComplete">Content index backfill complete: {0} documents added</sys:String>
+    <sys:String x:Key="Status.BackfillCancelled">Content index backfill cancelled</sys:String>
+    <sys:String x:Key="Status.BuildingFileNameIndex">Building file name index...</sys:String>
+    <sys:String x:Key="Status.BuildingContentIndex">Building content index...</sys:String>
+    <sys:String x:Key="Status.ContentIndexBuildFailed">Failed to build content index: {0}</sys:String>
+    <sys:String x:Key="Status.ContentIndexCancelled">Content index cancelled</sys:String>
+    <sys:String x:Key="Status.ContentIndexRebuildFailed">Content index rebuild failed: {0}</sys:String>
+    <sys:String x:Key="Status.RebuildComplete">Index rebuild complete! {0} file names, {1} content documents</sys:String>
+    <sys:String x:Key="Status.IndexCancelledFileName">File name index cancelled</sys:String>
+    <sys:String x:Key="Status.IndexCancelledContent">Content index cancelled</sys:String>
+    <sys:String x:Key="Status.FileNameIndexReady">Index ready, {0} files</sys:String>
+    <sys:String x:Key="Status.FileNameScanCancelled">File name scan cancelled</sys:String>
+    <sys:String x:Key="Status.FileNameIndexFailed">Index failed: {0}</sys:String>
+    <sys:String x:Key="Status.FileWatcherStartFailed">Drive {0}: file watcher failed to start (does not affect search): {1}</sys:String>
+    <sys:String x:Key="Status.FileWatcherError">File watcher error: {0}</sys:String>
+    <sys:String x:Key="Status.UsnUnavailableFallback">Cannot access volume {0}; falling back to directory traversal (run as administrator for maximum speed)</sys:String>
+    <sys:String x:Key="Status.UsnNotAvailable">USN Journal unavailable; using directory traversal</sys:String>
+    <sys:String x:Key="Status.EnumeratingMft">Enumerating MFT records (USN range: {0} ~ {1})...</sys:String>
+    <sys:String x:Key="Status.ScannedRecords">{0} records scanned...</sys:String>
+    <sys:String x:Key="Status.MftScanComplete">MFT scan complete: {0} records, resolving paths...</sys:String>
+    <sys:String x:Key="Status.ResolvingPaths">Resolving paths... {0}/{1}</sys:String>
+    <sys:String x:Key="Status.ScanComplete">Scan complete! {0} files in {1:F1} seconds</sys:String>
+    <sys:String x:Key="Status.NoFilesToIndex">Content index: no files to index, skipping rebuild</sys:String>
+    <sys:String x:Key="Status.ContentIndexingProgress">Indexing content... {0} files processed</sys:String>
+    <sys:String x:Key="Status.ContentIndexComplete">Content index complete! {0} documents in {1:F1} seconds</sys:String>
+    <sys:String x:Key="Status.PreviewFileNotFound">[File not found: {0}]</sys:String>
+    <sys:String x:Key="Status.PreviewLoadFailed">[Preview failed: {0}]</sys:String>
+    <sys:String x:Key="Status.PreviewBinaryNotSupported">[Cannot extract file content: {0}]</sys:String>
+    <sys:String x:Key="Status.PreviewFileTooLarge">[File too large ({0}), exceeds the 100MB limit and cannot be previewed]</sys:String>
+    <sys:String x:Key="Status.PreviewCancelled">[Preview cancelled]</sys:String>
+
+</ResourceDictionary>

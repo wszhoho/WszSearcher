@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using WszSearcher.Core.ContentSearch.Parsers;
 using WszSearcher.Core.Analysis;
+using WszSearcher.Core.Localization;
 using Lucene.Net.Documents;
 using Lucene.Net.Index;
 using Lucene.Net.Store;
@@ -24,8 +25,8 @@ public class ContentIndexer : IDisposable
     private bool _writerClosed;
     private bool _disposed;
 
-    /// <summary>索引状态事件</summary>
-    public event Action<string>? StatusChanged;
+    /// <summary>索引状态事件（携带资源 key 与参数，由 UI 层翻译显示）</summary>
+    public event Action<StatusMessage>? StatusChanged;
     /// <summary>索引进度（文件计数）</summary>
     public event Action<int>? ProgressChanged;
 
@@ -93,7 +94,7 @@ public class ContentIndexer : IDisposable
         var files = filePaths.ToList();
         if (files.Count == 0)
         {
-            StatusChanged?.Invoke("内容索引：没有找到需要索引的文件，跳过重建");
+            StatusChanged?.Invoke(new StatusMessage(StatusKeys.NoFilesToIndex));
             IsReady = true;
             return;
         }
@@ -104,7 +105,7 @@ public class ContentIndexer : IDisposable
         writer.Commit();
 
         var handler = StatusChanged;
-        handler?.Invoke("正在建立内容索引...");
+        handler?.Invoke(new StatusMessage(StatusKeys.BuildingContentIndex));
         var sw = Stopwatch.StartNew();
         var count = 0;
         const int reportInterval = 50;
@@ -123,7 +124,7 @@ public class ContentIndexer : IDisposable
                 if (n % reportInterval == 0)
                 {
                     DocCount = n; // 实时更新文档计数
-                    var mh = StatusChanged; mh?.Invoke($"内容索引中... 已处理 {n} 个文件");
+                    var mh = StatusChanged; mh?.Invoke(new StatusMessage(StatusKeys.ContentIndexingProgress, n));
                     var ph = ProgressChanged; ph?.Invoke(n);
                 }
             });
@@ -135,7 +136,7 @@ public class ContentIndexer : IDisposable
         sw.Stop();
 
         var finalHandler = StatusChanged;
-        finalHandler?.Invoke($"内容索引完成！共 {DocCount} 个文档，耗时 {sw.Elapsed.TotalSeconds:F1} 秒");
+        finalHandler?.Invoke(new StatusMessage(StatusKeys.ContentIndexComplete, DocCount, sw.Elapsed.TotalSeconds));
     }
 
     /// <summary>增量索引单个文件</summary>

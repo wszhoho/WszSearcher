@@ -25,6 +25,18 @@ public class PreviewResult
 
     /// <summary>高亮分段列表（后台预处理，避免 UI 线程字符串搜索）</summary>
     public List<HighlightSegment>? HighlightSegments { get; set; }
+
+    /// <summary>本地化占位消息 key（非空时 Content 为空，由 UI 层翻译显示）</summary>
+    public string? StatusKey { get; set; }
+
+    /// <summary>占位消息格式化参数</summary>
+    public object?[] StatusArgs { get; set; } = [];
+
+    /// <summary>截断元数据：原文总行数（null=未截断）</summary>
+    public int? TruncatedTotalLines { get; set; }
+
+    /// <summary>截断元数据：跳过的起始行数（null=未截断）</summary>
+    public int? TruncatedSkipLines { get; set; }
 }
 
 public enum PreviewType
