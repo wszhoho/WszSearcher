@@ -254,6 +254,9 @@ public partial class MainViewModel : ObservableObject
             // 在后台线程执行文件读取和高亮分段预处理，避免 IO 和字符串搜索阻塞 UI 线程
             var keyword = SearchText;
             var result = await Task.Run(() => _previewService.GetPreviewAsync(filePath, keyword));
+            // Core 层占位消息（文件不存在/过大/取消等）携带 StatusKey，由 UI 层翻译为显示文本
+            if (result.StatusKey is not null)
+                result.Content = LanguageManager.Get(result.StatusKey, result.StatusArgs);
             PreviewContent = result;
             IsPreviewVisible = true;
         }
