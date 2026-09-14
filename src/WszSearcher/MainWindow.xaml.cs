@@ -28,7 +28,7 @@ public partial class MainWindow : Window
     private const int HTBOTTOMLEFT = 16;
     private const int HTBOTTOMRIGHT = 17;
     private const int ResizeMargin = 6; // 边缘调整大小灵敏度
-    private const double CollapsedHeight = 52;  // 搜索框 48px + Grid margin 上下各 2px
+    private const double CollapsedHeight = 62;  // 搜索框 48px + 顶部拖动条 10px + Grid margin 上下各 2px
     private const double RowHeightPerItem = 58;   // 每条结果项约 58px
     private const double ResultHeaderHeight = 34; // 结果数量提示栏
     private const int MaxVisibleRows = 6;         // 最多显示 6 行
@@ -77,6 +77,9 @@ public partial class MainWindow : Window
         Loaded += OnLoaded;
 
         SourceInitialized += OnSourceInitialized;
+
+        // 窗口从托盘/后台重新激活时恢复搜索框焦点（透明窗口 caret 可能未自动恢复）
+        Activated += OnActivated;
     }
 
     /// <summary>监听 IsExpanded/ResultCount 变化，动态调整窗口</summary>
@@ -154,32 +157,46 @@ public partial class MainWindow : Window
         var w = ActualWidth;
         var h = ActualHeight;
 
-        // 边缘调整大小区域
-        var onLeft = clientPoint.X <= ResizeMargin;
-        var onRight = clientPoint.X >= w - ResizeMargin;
-        var onTop = clientPoint.Y <= ResizeMargin;
-        var onBottom = clientPoint.Y >= h - ResizeMargin;
+        // 搜索框顶部 Y（拖动条下边界）与搜索框矩形。
+        // HTCAPTION（拖动）与 HTCLIENT（聚焦）在同一区域互斥：
+        // 搜索框上方留一条拖动条（HTCAPTION，移动窗口），搜索框本身交给 WPF 聚焦（HTCLIENT）。
+        double searchBoxTopY = 0;
+        var searchBoxRect = default(Rect);
+        var hasSearchBox = false;
+        if (SearchBox is { } sb && sb.IsVisible && sb.ActualWidth > 0)
+        {
+            hasSearchBox = true;
+            var searchBoxOrigin = sb.TranslatePoint(new System.Windows.Point(0, 0), this);
+            searchBoxTopY = searchBoxOrigin.Y;
+            searchBoxRect = new System.Windows.Rect(
+                searchBoxOrigin,
+                new System.Windows.Size(sb.ActualWidth, sb.ActualHeight));
+        }
 
-        if (onTop && onLeft)     { handled = true; return (IntPtr)HTTOPLEFT; }
-        if (onTop && onRight)    { handled = true; return (IntPtr)HTTOPRIGHT; }
-        if (onBottom && onLeft)  { handled = true; return (IntPtr)HTBOTTOMLEFT; }
-        if (onBottom && onRight) { handled = true; return (IntPtr)HTBOTTOMRIGHT; }
-        if (onLeft)              { handled = true; return (IntPtr)HTLEFT; }
-        if (onRight)             { handled = true; return (IntPtr)HTRIGHT; }
-        if (onTop)               { handled = true; return (IntPtr)HTTOP; }
-        if (onBottom)            { handled = true; return (IntPtr)HTBOTTOM; }
-
-        // 搜索栏区域作为拖动区（但排除关闭按钮）
-        // 关闭按钮位置：右侧 32px 宽，搜索栏顶部
-        var closeBtnLeft = w - 2 - 48; // 外 Margin(2) + 按钮宽(48)
-        var inCloseButton = clientPoint.X >= closeBtnLeft && clientPoint.Y <= CollapsedHeight;
-
-        if (clientPoint.Y <= CollapsedHeight && !inCloseButton)
+        // 顶部拖动条：窗口顶部到搜索框顶部之间，用于移动窗口。
+        // （高度为自适应窗口，顶部不做 resize，整条作为拖动区）
+        if (clientPoint.Y < searchBoxTopY)
         {
             handled = true;
             return (IntPtr)HTCAPTION;
         }
 
+        // 左/右/底部边缘调整大小（宽度/高度手动微调）
+        var onLeft = clientPoint.X <= ResizeMargin;
+        var onRight = clientPoint.X >= w - ResizeMargin;
+        var onBottom = clientPoint.Y >= h - ResizeMargin;
+
+        if (onBottom && onLeft)  { handled = true; return (IntPtr)HTBOTTOMLEFT; }
+        if (onBottom && onRight) { handled = true; return (IntPtr)HTBOTTOMRIGHT; }
+        if (onLeft)              { handled = true; return (IntPtr)HTLEFT; }
+        if (onRight)             { handled = true; return (IntPtr)HTRIGHT; }
+        if (onBottom)            { handled = true; return (IntPtr)HTBOTTOM; }
+
+        // 搜索框区域：交给 WPF 处理（聚焦 + 文本光标定位）
+        if (hasSearchBox && searchBoxRect.Contains(clientPoint))
+            return IntPtr.Zero;
+
+        // 其余区域（关闭按钮、结果列表等）：交给 WPF 处理
         return IntPtr.Zero;
     }
 
@@ -196,11 +213,12 @@ public partial class MainWindow : Window
         FocusSearchBox();
     }
 
-    /// <summary>搜索栏拖动窗口</summary>
-    private void OnTitleBarMouseDown(object sender, MouseButtonEventArgs e)
+    /// <summary>窗口从托盘/后台重新激活时，若焦点已离开搜索框则恢复聚焦，
+    /// 确保 WPF 透明窗口的文本光标（caret）可靠重绘（该 bug 在窗口激活状态切换后高发）。</summary>
+    private void OnActivated(object? sender, EventArgs e)
     {
-        if (e.ChangedButton == MouseButton.Left && e.ClickCount == 1)
-            DragMove();
+        if (!ReferenceEquals(Keyboard.FocusedElement, SearchBox))
+            FocusSearchBox();
     }
 
     /// <summary>窗口关闭时最小化到托盘（不退出）；真正退出时不拦截</summary>

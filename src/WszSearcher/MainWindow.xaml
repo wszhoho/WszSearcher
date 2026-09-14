@@ -1,4 +1,4 @@
-﻿<Window x:Class="WszSearcher.MainWindow"
+<Window x:Class="WszSearcher.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -34,13 +34,14 @@
             <RowDefinition x:Name="ResultRow" Height="0" />
         </Grid.RowDefinitions>
 
-            <!-- ═══ 搜索栏 ═══ -->
-            <Border x:Name="SearchBarBorder" Grid.Row="0"
+            <!-- ═══ 搜索栏 ═══
+                 顶部 10px 留白作为窗口拖动条（HTCAPTION），搜索框本身可聚焦；
+                 拖动统一由 WM_NCHITTEST 命中测试处理，不再用 WPF DragMove（会与聚焦抢点击）。 -->
+            <Border x:Name="SearchBarBorder" Grid.Row="0" Margin="0,10,0,0"
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="0"
                     Background="{DynamicResource SurfaceBrush}"
-                    CornerRadius="8"
-                    MouseLeftButtonDown="OnTitleBarMouseDown">
+                    CornerRadius="8">
                 <DockPanel LastChildFill="True">
                     <!-- 关闭按钮 -->
                     <Button x:Name="CloseButton"
