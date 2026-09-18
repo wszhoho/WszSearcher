@@ -28,16 +28,24 @@
     </Window.Resources>
 
     <!-- 主容器：圆角阴影浮层 -->
-    <Grid Margin="2" Background="{DynamicResource SurfaceBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition x:Name="ResultRow" Height="0" />
-        </Grid.RowDefinitions>
+    <Border Margin="10"
+            Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="10">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="14" ShadowDepth="0" Direction="270" Opacity="0.18" Color="Black" />
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition x:Name="ResultRow" Height="0" />
+            </Grid.RowDefinitions>
 
             <!-- ═══ 搜索栏 ═══
                  顶部 10px 留白作为窗口拖动条（HTCAPTION），搜索框本身可聚焦；
                  拖动统一由 WM_NCHITTEST 命中测试处理，不再用 WPF DragMove（会与聚焦抢点击）。 -->
-            <Border x:Name="SearchBarBorder" Grid.Row="0" Margin="0,10,0,0"
+            <Border x:Name="SearchBarBorder" Grid.Row="0" Margin="0"
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="0"
                     Background="{DynamicResource SurfaceBrush}"
@@ -268,5 +276,6 @@
                            VerticalAlignment="Center"
                            Visibility="{Binding HasNoResults, Converter={StaticResource BoolToVis}}" />
             </Grid>
-    </Grid>
+        </Grid>
+    </Border>
 </Window>

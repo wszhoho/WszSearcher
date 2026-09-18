@@ -28,7 +28,7 @@ public partial class MainWindow : Window
     private const int HTBOTTOMLEFT = 16;
     private const int HTBOTTOMRIGHT = 17;
     private const int ResizeMargin = 6; // 边缘调整大小灵敏度
-    private const double CollapsedHeight = 62;  // 搜索框 48px + 顶部拖动条 10px + Grid margin 上下各 2px
+    private const double CollapsedHeight = 68;  // 搜索框 48px + 顶部拖动条 10px + 外层 Border margin 上下各 10px
     private const double RowHeightPerItem = 58;   // 每条结果项约 58px
     private const double ResultHeaderHeight = 34; // 结果数量提示栏
     private const int MaxVisibleRows = 6;         // 最多显示 6 行
@@ -117,7 +117,7 @@ public partial class MainWindow : Window
         var resultHeight = count <= 0 ? MaxResultHeight
             : Math.Min(RowHeightPerItem * count + ResultHeaderHeight, MaxResultHeight);
 
-        _expandedHeight = CollapsedHeight + resultHeight + 16; // 16px 窗口边距
+        _expandedHeight = CollapsedHeight + resultHeight + 8; // 底部预留（外层 Border margin 已含 10px）
         Height = _expandedHeight;
     }
 
