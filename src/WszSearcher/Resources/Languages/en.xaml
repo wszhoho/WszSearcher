@@ -112,6 +112,8 @@
     <sys:String x:Key="Status.BackfillingMissingIndex">Backfilling missing content index ({0} files)...</sys:String>
     <sys:String x:Key="Status.BackfillComplete">Content index backfill complete: {0} documents added</sys:String>
     <sys:String x:Key="Status.BackfillCancelled">Content index backfill cancelled</sys:String>
+    <sys:String x:Key="Status.BackfillRemovingStale">Removing stale content index documents ({0})...</sys:String>
+    <sys:String x:Key="Status.BackfillCompleteReconcile">Content index reconciled: {0} stale documents removed</sys:String>
     <sys:String x:Key="Status.BuildingFileNameIndex">Building file name index...</sys:String>
     <sys:String x:Key="Status.BuildingContentIndex">Building content index...</sys:String>
     <sys:String x:Key="Status.ContentIndexBuildFailed">Failed to build content index: {0}</sys:String>

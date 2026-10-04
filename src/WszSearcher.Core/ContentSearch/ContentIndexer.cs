@@ -205,6 +205,33 @@ public class ContentIndexer : IDisposable
         }
     }
 
+    /// <summary>
+    /// 从索引中批量删除多个文件（对账清理残留用）。
+    /// Lucene 的 DeleteDocuments 标记删除，仅需在结尾单次 Commit，避免逐个 Commit 拖慢大批量清理。
+    /// </summary>
+    /// <param name="paths">要删除的完整路径集合</param>
+    /// <returns>实际执行删除的路径数</returns>
+    public int RemoveFiles(IEnumerable<string> paths)
+    {
+        var list = paths?.Where(p => !string.IsNullOrEmpty(p)).ToList();
+        if (list is null || list.Count == 0) return 0;
+
+        try
+        {
+            var writer = GetWriter();
+            foreach (var filePath in list)
+                writer.DeleteDocuments(new Term("path", filePath));
+            writer.Commit();
+            DocCount = writer.NumDocs();
+            return list.Count;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"批量删除文件索引失败: {ex.Message}");
+            return 0;
+        }
+    }
+
     /// <summary>优化索引</summary>
     public void Optimize()
     {

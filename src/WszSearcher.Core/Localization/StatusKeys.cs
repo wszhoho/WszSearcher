@@ -11,6 +11,8 @@ public static class StatusKeys
     public const string BackfillingMissingIndex = "Status.BackfillingMissingIndex";
     public const string BackfillComplete = "Status.BackfillComplete";
     public const string BackfillCancelled = "Status.BackfillCancelled";
+    public const string BackfillRemovingStale = "Status.BackfillRemovingStale";
+    public const string BackfillCompleteReconcile = "Status.BackfillCompleteReconcile";
     public const string BuildingFileNameIndex = "Status.BuildingFileNameIndex";
     public const string BuildingContentIndex = "Status.BuildingContentIndex";
     public const string ContentIndexBuildFailed = "Status.ContentIndexBuildFailed";

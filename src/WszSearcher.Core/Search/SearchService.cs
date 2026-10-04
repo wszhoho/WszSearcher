@@ -157,8 +157,9 @@ public class SearchService : ISearchService, IDisposable
     }
 
     /// <summary>
-    /// 启动后后台补齐缺失的内容索引：对比磁盘文件与索引已有文档，只索引缺失部分。
-    /// 解决历史文件在 watcher 未启动期间未被索引、只能重建才能搜到的问题；保留现有索引，不打断搜索
+    /// 启动后后台对账内容索引：补齐缺失（磁盘有、索引无）+ 清理残留（索引有、磁盘无）。
+    /// 解决历史文件在 watcher 未启动期间未被索引、以及手动删除文件后索引残留的问题；
+    /// 保留现有索引，不打断搜索。二者都只在全盘枚举一轮内完成，增量成本接近零。
     /// </summary>
     private async Task BackfillMissingAsync()
     {
@@ -167,25 +168,52 @@ public class SearchService : ISearchService, IDisposable
         var ct = _backfillCts.Token;
         try
         {
-            // 1. 索引中已有的路径集合
+            // 0. 索引中已有的路径集合 + 磁盘全量路径集合（一次枚举，供两个方向用）
             var indexed = _contentIndexer.GetIndexedPaths();
             ct.ThrowIfCancellationRequested();
 
-            // 2. 枚举磁盘并求差集（磁盘有、索引无）
-            var missing = new List<string>();
-            foreach (var f in EnumerateFilesFromPaths(_indexPaths))
+            var diskPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var diskFiles = EnumerateFilesFromPaths(_indexPaths);
+            foreach (var f in diskFiles)
             {
                 ct.ThrowIfCancellationRequested();
+                diskPaths.Add(f);
+            }
+
+            // 1. 补齐缺失：磁盘有、索引无
+            var missing = new List<string>();
+            foreach (var f in diskPaths)
+            {
                 if (!indexed.Contains(f)) missing.Add(f);
+            }
+
+            // 2. 清理残留：索引有、磁盘无（文件已被删除/移除）。
+            //    用 File.Exists 精确判断，避免受磁盘枚举 maxFiles 截断影响而误删仍存在的文件
+            var stale = new List<string>();
+            foreach (var p in indexed)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!System.IO.File.Exists(p)) stale.Add(p);
+            }
+
+            // 3. 先清理残留（一个 batch），再补齐缺失
+            if (stale.Count > 0)
+            {
+                StatusMessage?.Invoke(new StatusMessage(StatusKeys.BackfillRemovingStale, stale.Count));
+                _contentIndexer.RemoveFiles(stale);
+                IndexUpdated?.Invoke(); // 通知 UI 刷新
+                _contentIndexer.SyncDocCount();
             }
 
             if (missing.Count == 0)
             {
-                StatusMessage?.Invoke(new StatusMessage(StatusKeys.ContentIndexCompleteNoBackfill));
+                StatusMessage?.Invoke(new StatusMessage(stale.Count > 0
+                    ? StatusKeys.BackfillCompleteReconcile
+                    : StatusKeys.ContentIndexCompleteNoBackfill, stale.Count));
                 return;
             }
 
-            // 3. 逐文件补齐（IndexFileInternal 内含 File.Exists 防复活校验）
+            // 逐文件补齐（IndexFileInternal 内含 File.Exists 防复活校验）
             StatusMessage?.Invoke(new StatusMessage(StatusKeys.BackfillingMissingIndex, missing.Count));
             foreach (var f in missing)
             {

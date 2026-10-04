@@ -112,6 +112,8 @@
     <sys:String x:Key="Status.BackfillingMissingIndex">正在补齐缺失的内容索引（{0} 个文件）...</sys:String>
     <sys:String x:Key="Status.BackfillComplete">内容索引补齐完成：新增 {0} 个文档</sys:String>
     <sys:String x:Key="Status.BackfillCancelled">内容索引补齐已取消</sys:String>
+    <sys:String x:Key="Status.BackfillRemovingStale">正在清理残留的内容索引（{0} 个文档）...</sys:String>
+    <sys:String x:Key="Status.BackfillCompleteReconcile">内容索引对账完成：清理 {0} 个残留文档</sys:String>
     <sys:String x:Key="Status.BuildingFileNameIndex">正在建立文件名索引...</sys:String>
     <sys:String x:Key="Status.BuildingContentIndex">正在建立内容索引...</sys:String>
     <sys:String x:Key="Status.ContentIndexBuildFailed">内容索引建立失败：{0}</sys:String>
