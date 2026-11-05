@@ -416,45 +416,11 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             app.ApplyHotkey(_settings.HotkeyModifiers, _settings.HotkeyKey);
 
         // 开机自启
-        SetAutoStart(_settings.AutoStart);
+        AutoStartManager.Set(_settings.AutoStart);
 
         // 通知用户
         System.Windows.MessageBox.Show(LanguageManager.Get("Lang.Settings.Saved"),
             LanguageManager.Get("Lang.Message.Notice"), MessageBoxButton.OK, MessageBoxImage.Information);
-    }
-
-    private static void SetAutoStart(bool enable)
-    {
-        var exe = Environment.ProcessPath;
-        if (string.IsNullOrEmpty(exe)) return;
-        try
-        {
-            if (enable)
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "schtasks",
-                    Arguments = $"/Create /F /SC ONLOGON /TN \"WszSearcher\" /TR \"\\\"{exe}\\\"\" /RL HIGHEST",
-                    UseShellExecute = true,
-                    Verb = "runas",
-                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden // 隐藏 schtasks 控制台窗口
-                };
-                System.Diagnostics.Process.Start(psi)?.WaitForExit(5000);
-            }
-            else
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "schtasks",
-                    Arguments = "/Delete /F /TN \"WszSearcher\"",
-                    UseShellExecute = true,
-                    Verb = "runas",
-                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden // 隐藏 schtasks 控制台窗口
-                };
-                System.Diagnostics.Process.Start(psi)?.WaitForExit(5000);
-            }
-        }
-        catch { /* 权限不足时跳过 */ }
     }
 
     [RelayCommand]

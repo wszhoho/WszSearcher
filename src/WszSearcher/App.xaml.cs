@@ -86,52 +86,8 @@ namespace WszSearcher;
 
     private void SyncAutoStart()
     {
-        try
-        {
-            if (_settings is null) return;
-
-            if (_settings.AutoStart)
-                ScheduleAutoStart();
-            else
-                UnscheduleAutoStart();
-        }
-        catch { }
-    }
-
-    /// <summary>创建计划任务实现开机自启（支持管理员提权）</summary>
-    private static void ScheduleAutoStart()
-    {
-        var exe = Environment.ProcessPath;
-        if (string.IsNullOrEmpty(exe)) return;
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "schtasks",
-                Arguments = $"/Create /F /SC ONLOGON /TN \"WszSearcher\" /TR \"\\\"{exe}\\\"\" /RL HIGHEST",
-                UseShellExecute = true,
-                Verb = "runas",
-                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden // 隐藏 schtasks 控制台窗口，避免开机时黑色终端闪现
-            })?.WaitForExit(5000);
-        }
-        catch { }
-    }
-
-    /// <summary>删除计划任务</summary>
-    private static void UnscheduleAutoStart()
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "schtasks",
-                Arguments = "/Delete /F /TN \"WszSearcher\"",
-                UseShellExecute = true,
-                Verb = "runas",
-                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden // 隐藏 schtasks 控制台窗口
-            })?.WaitForExit(5000);
-        }
-        catch { }
+        if (_settings is null) return;
+        AutoStartManager.Set(_settings.AutoStart);
     }
 
     private void OnTrayLeftClick(object sender, RoutedEventArgs e)
